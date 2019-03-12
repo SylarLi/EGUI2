@@ -64,7 +64,7 @@ namespace EGUI.UI
             DrawContent(new GUIContent(text));
         }
 
-        public override Vector2 GetPreferredSize()
+        public override Vector2 GetContentSize()
         {
             return style.CalcSize(new GUIContent(text));
         }

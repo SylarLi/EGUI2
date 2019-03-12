@@ -144,7 +144,7 @@ namespace EGUI.UI
             }
         }
 
-        public override Vector2 GetPreferredSize()
+        public override Vector2 GetContentSize()
         {
             return layoutSize;
         }

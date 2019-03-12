@@ -137,7 +137,7 @@ namespace EGUI.UI
             {
                 text = (string)newText;
                 onInputValueChanged.Invoke(text);
-                //Command.Execute(new UpdateMemberCommand(this, "mText", newText));
+                Command.Execute(new UpdateMemberCommand(this, "text", newText));
             }
         }
 

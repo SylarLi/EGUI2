@@ -17,7 +17,7 @@ namespace EGUI
             mName = type.GetProperty("Name");
         }
 
-        public override Type persistentType { get { return FindType("System.Reflection.MonoProperty"); } }
+        public override Type persistentType { get { return CoreUtil.FindType("System.Reflection.MonoProperty"); } }
 
         public override void Parse(object value, BinaryWriter writer)
         {

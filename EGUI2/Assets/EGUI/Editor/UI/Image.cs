@@ -36,11 +36,11 @@ namespace EGUI.UI
             }
         }
 
-        public override Vector2 GetPreferredSize()
+        public override Vector2 GetContentSize()
         {
             return activeSprite != null ?
                 new Vector2(activeSprite.rect.width, activeSprite.rect.height) :
-                base.GetPreferredSize();  
+                base.GetContentSize();  
         }
     }
 }

@@ -23,7 +23,7 @@ namespace EGUI
             mIsPublic = type.GetProperty("IsPublic");
         }
 
-        public override Type persistentType { get { return FindType("System.Reflection.MonoField"); } }
+        public override Type persistentType { get { return CoreUtil.FindType("System.Reflection.MonoField"); } }
 
         public override void Parse(object value, BinaryWriter writer)
         {

@@ -1,4 +1,5 @@
 ﻿using System;
+using UnityEngine;
 
 namespace EGUI.Editor
 {
@@ -10,6 +11,7 @@ namespace EGUI.Editor
 
         public CustomEditorAttribute(Type type)
         {
+            Debug.Assert(typeof(EditorDrawer).IsAssignableFrom(type), "Type should be derived from Editor.");
             mType = type;
         }
     }

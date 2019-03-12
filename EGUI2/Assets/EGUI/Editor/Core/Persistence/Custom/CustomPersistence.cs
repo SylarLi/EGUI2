@@ -99,10 +99,5 @@ namespace EGUI
         {
             return persistence.DeserializeArray(type, reader);
         }
-
-        protected Type FindType(string name)
-        {
-            return persistence.FindType(name);
-        }
     }
 }

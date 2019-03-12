@@ -17,25 +17,27 @@ namespace EGUI.Editor
         [SerializeField]
         byte[] moduleBytes;
 
+        Node[] nodes;
+
+        PersistentObject pobj;
+
         private void OnGUI()
         {
             if (GUILayout.Button("Test"))
             {
-                var node = new Node();
-                node.localPosition = new Vector2(100, 50);
-                var sobj = new SerializedObject(new object[] { node });
-                Debug.Assert(sobj.type == typeof(Node));
-                Debug.Assert(sobj.GetValue<Node>() == node);
-                var sprop = sobj.Find("localPosition");
-                Debug.Assert(sprop.GetValue<Vector2>() == node.localPosition);
-                sprop.SetValue(new Vector2(1, 2));
-                Debug.Assert(sprop.GetValue<Vector2>() == new Vector2(1, 2));
-                Debug.Assert(sprop.GetValue<Vector2>() == node.localPosition);
-                var spropx = sprop.Find("x");
-                spropx.SetValue(3f);
-                Debug.Assert(sprop.GetValue<Vector2>() == new Vector2(3, 2));
-                Debug.Assert(sprop.GetValue<Vector2>() == node.localPosition);
+                
             }
+            if (pobj == null)
+            {
+                var node = new Node();
+                node.localPosition = new Vector2(1, 2);
+                var node1 = new Node();
+                node1.localPosition = new Vector2(3, 4);
+                nodes = new Node[] { node, node1 };
+                pobj = new PersistentObject(nodes);
+            }
+            var prop = pobj.Find("localPosition");
+            EditorUtil.PropertyField(new GUIContent(prop.displayName), prop, true);
             if (moduleBytes != null && moduleBytes.Length > 0)
             {
                 mRoot = new Persistence().Deserialize<Node>(moduleBytes);

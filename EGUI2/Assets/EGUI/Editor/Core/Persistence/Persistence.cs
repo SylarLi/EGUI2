@@ -65,7 +65,7 @@ namespace EGUI
                 .Where(t => baseType.IsAssignableFrom(t) && !t.IsAbstract);
             foreach (var type in customTypes)
             {
-                var instance = (CustomPersistence)CreateInstance(type, new object[] { this });
+                var instance = (CustomPersistence)CoreUtil.CreateInstance(type, new object[] { this });
                 mCustomPersistenceMap.Add(instance.persistentType, instance);
             }
         }
@@ -209,7 +209,7 @@ namespace EGUI
             var fields = new List<FieldInfo>();
             var fieldFlags = BindingFlags.Public | BindingFlags.NonPublic;
             fieldFlags |= (instance ? BindingFlags.Instance : BindingFlags.Static);
-            GetFields(fields, type, fieldFlags, true);
+            CoreUtil.GetFields(fields, type, fieldFlags, true);
             var typeAttrs = type.GetCustomAttributes(typeof(PersistenceAttribute), false);
             if (typeAttrs != null && typeAttrs.Length > 0)
             {
@@ -402,14 +402,14 @@ namespace EGUI
 
         public object DeserializeConstruction(Type type, bool instance, BinaryReader reader)
         {
-            var obj = instance ? CreateInstance(type) : null;
+            var obj = instance ? CoreUtil.CreateInstance(type) : null;
             var fieldCount = reader.ReadInt32();
             for (int i = 0; i < fieldCount; i++)
             {
                 var fieldName = reader.ReadString();
                 var fieldFlags = BindingFlags.Public | BindingFlags.NonPublic;
                 fieldFlags |= (instance ? BindingFlags.Instance : BindingFlags.Static);
-                var field = GetField(type, fieldName, fieldFlags, true);
+                var field = CoreUtil.GetField(type, fieldName, fieldFlags, true);
                 Debug.Assert(field != null, type.FullName + "." + fieldName + " not exist.");
                 Deserialize(reader, ret => {
                     if (field != null)
@@ -437,7 +437,7 @@ namespace EGUI
         {
             Debug.Assert(type.IsArray);
             var length = reader.ReadInt32();
-            var obj = CreateInstance(type, new object[] { length }) as Array;
+            var obj = CoreUtil.CreateInstance(type, new object[] { length }) as Array;
             for (int i = 0; i < obj.Length; i++)
             {
                 var index = i;
@@ -491,14 +491,14 @@ namespace EGUI
                 {
                     genericArgs[i] = DeserializeTypePure(reader);
                 } 
-                var type = FindType(genericTypeDefName);
+                var type = CoreUtil.FindType(genericTypeDefName);
                 type = type.MakeGenericType(genericArgs);
                 return type;
             }
             else
             {
                 var fullName = reader.ReadString();
-                var type = FindType(fullName);
+                var type = CoreUtil.FindType(fullName);
                 return type;
             }
         }
@@ -620,58 +620,6 @@ namespace EGUI
                 throw new NotSupportedException("Invalid asset type: " + assetType);
             }
             return asset;
-        }
-
-        public object CreateInstance(Type type, object[] args = null)
-        {
-            if (type.IsSubclassOf(typeof(ScriptableObject)))
-            {
-                return ScriptableObject.CreateInstance(type);
-            }
-            else if (type.IsSubclassOf(typeof(UnityEngine.Object)))
-            {
-                throw new NotSupportedException();
-            }
-            return Activator.CreateInstance(type, args);
-        }
-
-        public Type FindType(string name, bool throwOnError = false)
-        {
-            Type type = null;
-            if (!string.IsNullOrEmpty(name))
-            {
-                type = Type.GetType(name);
-                if (type == null)
-                {
-                    var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-                    foreach (var assembly in assemblies)
-                    {
-                        type = assembly.GetType(name);
-                        if (type != null)
-                            break;
-                    }
-                }
-            }
-            if (throwOnError && type == null)
-                throw new NullReferenceException("Can not find type: " + name);
-            return type;
-        }
-
-        public void GetFields(ICollection<FieldInfo> fields, Type type, BindingFlags flag, bool inherit)
-        {
-            var typeFields = type.GetFields(flag);
-            foreach (var typeField in typeFields)
-                fields.Add(typeField);
-            if (inherit && type.BaseType != null)
-                GetFields(fields, type.BaseType, flag, inherit);
-        }
-
-        public FieldInfo GetField(Type type, string name, BindingFlags flag, bool inherit)
-        {
-            var field = type.GetField(name, flag);
-            if (field == null && inherit && type.BaseType != null)
-                field = GetField(type.BaseType, name, flag, inherit);
-            return field;
         }
     }
 }

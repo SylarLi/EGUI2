@@ -4,7 +4,7 @@ using UnityEngine;
 namespace EGUI.UI
 {
     [Persistence]
-    public class LayoutGroup : Leaf, IPreferredSizable
+    public class LayoutGroup : Leaf, IContentSizeFitable
     {
         public enum Alignment
         {
@@ -139,7 +139,7 @@ namespace EGUI.UI
             return Vector2.zero;
         }
 
-        public virtual Vector2 GetPreferredSize()
+        public virtual Vector2 GetContentSize()
         {
             return node.size;
         }

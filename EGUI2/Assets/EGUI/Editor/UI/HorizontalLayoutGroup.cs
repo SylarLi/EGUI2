@@ -57,7 +57,7 @@ namespace EGUI.UI
             }
         }
 
-        public override Vector2 GetPreferredSize()
+        public override Vector2 GetContentSize()
         {
             Vector2 size = Vector2.zero;
             foreach (var child in layoutChildren)

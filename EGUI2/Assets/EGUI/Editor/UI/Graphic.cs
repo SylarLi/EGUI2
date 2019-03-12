@@ -5,7 +5,7 @@ namespace EGUI.UI
 {
     [Persistence]
     [RequireLeaf(typeof(Drawer))]
-    public abstract class Graphic : Leaf, IPreferredSizable
+    public abstract class Graphic : Leaf, IContentSizeFitable
     {
         private Canvas mCanvas;
 
@@ -108,7 +108,7 @@ namespace EGUI.UI
             drawer.drawProxy = process;
         }
 
-        public virtual Vector2 GetPreferredSize()
+        public virtual Vector2 GetContentSize()
         {
             return node.size;
         }

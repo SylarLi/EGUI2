@@ -28,7 +28,7 @@
                 if (layoutGroup != null)
                 {
                     var size = layoutGroup.node.size;
-                    var contentSize = layoutGroup.GetPreferredSize();
+                    var contentSize = layoutGroup.GetContentSize();
                     if (horizontalFit == FitMode.PreferredSize)
                     {
                         size.x = contentSize.x;
@@ -45,7 +45,7 @@
                     if (graphic != null)
                     {
                         var size = graphic.node.size;
-                        var contentSize = graphic.GetPreferredSize();
+                        var contentSize = graphic.GetContentSize();
                         if (horizontalFit == FitMode.PreferredSize)
                         {
                             size.x = contentSize.x;
