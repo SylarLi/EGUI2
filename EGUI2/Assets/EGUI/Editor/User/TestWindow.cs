@@ -31,13 +31,17 @@ namespace EGUI.Editor
             {
                 var node = new Node();
                 node.localPosition = new Vector2(1, 2);
+                node.name = "A";
                 var node1 = new Node();
-                node1.localPosition = new Vector2(3, 4);
+                node1.localPosition = new Vector2(1, 4);
+                node1.name = "B";
                 nodes = new Node[] { node, node1 };
                 pobj = new PersistentObject(nodes);
             }
             var prop = pobj.Find("localPosition");
-            EditorUtil.PropertyField(new GUIContent(prop.displayName), prop, true);
+            PersistentGUILayout.PropertyField(prop);
+            var prop1 = pobj.Find("name");
+            PersistentGUILayout.PropertyField(prop1);
             if (moduleBytes != null && moduleBytes.Length > 0)
             {
                 mRoot = new Persistence().Deserialize<Node>(moduleBytes);

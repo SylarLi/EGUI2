@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace EGUI.Editor
 {
-    public class PersistentProperty : Object
+    public class PersistentProperty
     {
         private Type mType;
 
@@ -35,7 +35,7 @@ namespace EGUI.Editor
             }
         }
 
-        public PersistentProperty(PersistentObject persistentObject, string propertyPath) : base()
+        public PersistentProperty(PersistentObject persistentObject, string propertyPath)
         {
             Debug.Assert(persistentObject != null, "PersistentObject can not be null.");
             Debug.Assert(!string.IsNullOrEmpty(propertyPath), "Property path is not specified.");
@@ -47,7 +47,14 @@ namespace EGUI.Editor
 
         public PersistentProperty Find(string relativePath)
         {
-            return new PersistentProperty(persistentObject, Path.Combine(propertyPath, relativePath));
+            return new PersistentProperty(persistentObject, propertyPath + "." + relativePath);
+        }
+
+        public PersistentProperty[] Find(string[] relativePaths)
+        {
+            return (from path in relativePaths
+                    select Find(path))
+                    .ToArray();
         }
 
         public T GetValue<T>()

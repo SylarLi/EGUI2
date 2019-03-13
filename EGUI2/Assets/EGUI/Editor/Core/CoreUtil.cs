@@ -104,7 +104,7 @@ namespace EGUI
         {
             Debug.Assert(type != null, "Type can not be null.");
             Debug.Assert(!string.IsNullOrEmpty(memberPath), "MemberPath can not be empty.");
-            var names = memberPath.Split(new char[] { '\\', '/' });
+            var names = memberPath.Split(new char[] { '.' });
             var path = new MemberInfo[names.Length];
             int index = 0;
             while (type != null &&

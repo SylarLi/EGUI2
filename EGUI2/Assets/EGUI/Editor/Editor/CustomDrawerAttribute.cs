@@ -9,10 +9,15 @@ namespace EGUI.Editor
 
         public Type type { get { return mType; } }
 
-        public CustomDrawerAttribute(Type type)
+        private bool mFoldEnabled;
+
+        public bool foldEnabled { get { return mFoldEnabled; } }
+
+        public CustomDrawerAttribute(Type type, bool foldEnabled = true)
         {
             Debug.Assert(typeof(PropertyDrawer).IsAssignableFrom(type), "Type should be derived from PropertyDrawer.");
             mType = type;
+            mFoldEnabled = foldEnabled;
         }
     }
 }

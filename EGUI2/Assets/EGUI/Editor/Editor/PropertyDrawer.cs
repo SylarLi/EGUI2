@@ -2,15 +2,14 @@
 
 namespace EGUI.Editor
 {
-    [Persistence]
-    public abstract class PropertyDrawer : Object
+    public abstract class PropertyDrawer
     {
-        public virtual void OnGUI(Rect rect, PersistentProperty persistentProperty, GUIContent label)
+        public virtual void OnGUI(Rect position, PersistentProperty property, GUIContent label)
         {
             
         }
 
-        public virtual float GetPropertyHeight(PersistentProperty persistentProperty, GUIContent label)
+        public virtual float GetPropertyHeight(PersistentProperty property, GUIContent label)
         {
             return 0;
         }

@@ -2,6 +2,7 @@
 using System.IO;
 using UnityEngine;
 using UnityEditor;
+using Sprite = UnityEngine.Sprite;
 
 namespace EGUI
 {

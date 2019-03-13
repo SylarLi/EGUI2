@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace EGUI.Editor
 {
-    public class PersistentObject : Object
+    public class PersistentObject
     {
         private object[] mValues;
 
@@ -14,7 +14,7 @@ namespace EGUI.Editor
 
         public Type type { get { return mType; } }
 
-        public PersistentObject(object[] values) : base()
+        public PersistentObject(object[] values)
         {
             Debug.Assert(values.Length > 0 && values.All(i => i != null), "Object can not be null.");
             Debug.Assert(values.All(i => i.GetType() == values[0].GetType()), "All objects should be the same type.");
