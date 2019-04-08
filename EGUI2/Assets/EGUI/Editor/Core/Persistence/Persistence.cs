@@ -15,6 +15,7 @@ namespace EGUI
     /// 支持: 原始数据类型/System.String/System.Type/UnityEngine.Object/以及其他复合类型数据结构，如果是类，必须拥有默认构造器
     /// 不支持: IntPtr/UIntPtr/delegate/index属性(例如public int this[int index])
     /// Auto-implemented属性会生成一个名为<propertyName>k__BackingField字段，带来各种意想不到的情况，请尽量避免使用
+    /// 可继承CustomPersistence进行自定义扩展
     /// </summary>
     public sealed class Persistence
     {

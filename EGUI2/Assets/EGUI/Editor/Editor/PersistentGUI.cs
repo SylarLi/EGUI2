@@ -99,7 +99,6 @@ namespace EGUI.Editor
             return EditorGUI.BoundsField(position, label, value);
         }
 
-        // 注：暂不支持默认递归属性显示
         public static void PropertyField(Rect position, GUIContent label, PersistentProperty property, bool includeChildren)
         {
             var propertyType = property.type;
@@ -117,7 +116,7 @@ namespace EGUI.Editor
                     propertyDrawer.OnGUI(propertyRect, property, label);
                 }
             }
-            else
+            else if (Caches.IsDefaultPropertyType(propertyType))
             {
                 DefaultPropertyField(position, label, property);
             }
@@ -301,7 +300,8 @@ namespace EGUI.Editor
                 {
                     updateValue = TextField(position, label, (string)propertyValue, EditorStyles.textField);
                 }
-                else if (propertyType == typeof(Color))
+                else if (propertyType == typeof(Color) ||
+                    propertyType == typeof(Color32))
                 {
                     updateValue = ColorField(position, label, (Color)propertyValue);
                 }
@@ -319,7 +319,7 @@ namespace EGUI.Editor
                 }
                 else
                 {
-                    LabelField(position, label, GUIContent.none, EditorStyles.label);
+                    throw new NotSupportedException("Invalide default type: " + propertyType.FullName);
                 }
                 if (EditorGUI.EndChangeCheck())
                 {
@@ -407,9 +407,36 @@ namespace EGUI.Editor
 
         internal class CacheData
         {
+            private HashSet<Type> mDefaultPropertyType = new HashSet<Type>();
+
             private Dictionary<Type, PropertyDrawer> mDrawers = new Dictionary<Type, PropertyDrawer>();
 
             private List<FoldData> mFoldouts = new List<FoldData>();
+
+            public bool IsDefaultPropertyType(Type propertyType)
+            {
+                if (mDefaultPropertyType.Count == 0)
+                {
+                    mDefaultPropertyType.Add(typeof(Vector2));
+                    mDefaultPropertyType.Add(typeof(Vector3));
+                    mDefaultPropertyType.Add(typeof(Vector4));
+                    mDefaultPropertyType.Add(typeof(Rect));
+                    mDefaultPropertyType.Add(typeof(Bounds));
+                    mDefaultPropertyType.Add(typeof(Color));
+                    mDefaultPropertyType.Add(typeof(UnityEngine.Object));
+                    mDefaultPropertyType.Add(typeof(AnimationCurve));
+                    mDefaultPropertyType.Add(typeof(Color32));
+                    mDefaultPropertyType.Add(typeof(bool));
+                    mDefaultPropertyType.Add(typeof(int));
+                    mDefaultPropertyType.Add(typeof(long));
+                    mDefaultPropertyType.Add(typeof(float));
+                    mDefaultPropertyType.Add(typeof(double));
+                    mDefaultPropertyType.Add(typeof(string));
+                }
+                return mDefaultPropertyType.Contains(propertyType) ||
+                    propertyType.IsEnum ||
+                    propertyType.IsSubclassOf(typeof(UnityEngine.Object));
+            }
 
             public PropertyDrawer GetDrawer(Type propertyType)
             {

@@ -49,11 +49,11 @@ namespace EGUI.UI
 
         public OnInputValueChanged onInputValueChanged = value => { };
 
-        private FieldInfo mRefTextEditor;
+        private static FieldInfo mRefTextEditor;
 
-        private MethodInfo mRefIsEditing;
+        private static MethodInfo mRefIsEditing;
 
-        private MethodInfo mRefTextField;
+        private static MethodInfo mRefTextField;
 
         public override void RebuildStyle()
         {
