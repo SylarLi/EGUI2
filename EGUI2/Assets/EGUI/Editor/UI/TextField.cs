@@ -71,18 +71,12 @@ namespace EGUI.UI
 
         protected override void OnDraw()
         {
+            PrapareProxyField();
             DrawProcess(DrawTextField);
         }
 
         private void DrawTextField()
         {
-            if (mRefTextEditor == null || mRefTextField == null)
-            {
-                var type = typeof(UnityEditor.EditorGUI);
-                mRefTextEditor = type.GetField("s_RecycledEditor", BindingFlags.NonPublic | BindingFlags.Static);
-                mRefIsEditing = mRefTextEditor.FieldType.GetMethod("IsEditingControl", BindingFlags.NonPublic | BindingFlags.Instance);
-                mRefTextField = type.GetMethod("DoTextField", BindingFlags.NonPublic | BindingFlags.Static);
-            }
             var rawColor = GUI.color;
             var rawSelectionColor = GUI.skin.settings.selectionColor;
             var rawCursorColor = GUI.skin.settings.cursorColor;
@@ -111,6 +105,7 @@ namespace EGUI.UI
 
         public void OnEvent(Event eventData)
         {
+            PrapareProxyField();
             var controlID = GUIUtility.GetControlID(FocusType.Keyboard);
             var recycledEditor = mRefTextEditor.GetValue(null);
             var isEditingBeforce = (bool)mRefIsEditing.Invoke(recycledEditor, new object[] { controlID });
@@ -147,6 +142,17 @@ namespace EGUI.UI
             if (GUIUtility.keyboardControl == controlID)
             {
                 GUIUtility.keyboardControl = 0;
+            }
+        }
+
+        private void PrapareProxyField()
+        {
+            if (mRefTextEditor == null || mRefTextField == null)
+            {
+                var type = typeof(UnityEditor.EditorGUI);
+                mRefTextEditor = type.GetField("s_RecycledEditor", BindingFlags.NonPublic | BindingFlags.Static);
+                mRefIsEditing = mRefTextEditor.FieldType.GetMethod("IsEditingControl", BindingFlags.NonPublic | BindingFlags.Instance);
+                mRefTextField = type.GetMethod("DoTextField", BindingFlags.NonPublic | BindingFlags.Static);
             }
         }
     }

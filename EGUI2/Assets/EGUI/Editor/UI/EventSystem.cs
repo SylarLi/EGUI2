@@ -49,7 +49,7 @@ namespace EGUI.UI
             else
             {
                 var current = FocusControl.currentSelectable;
-                if (current != null && current is Leaf)
+                if (current != null && current is Leaf && (current as Leaf) != null)
                 {
                     mTriggers.Add((current as Leaf).node);
                 }

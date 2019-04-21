@@ -8,6 +8,14 @@ namespace EGUI.Editor
 {
     public sealed class PersistentGUILayout
     {
+        public static void UserDrawerLayout(PersistentObject obj)
+        {
+            Debug.Assert(obj.type.IsSubclassOf(typeof(Leaf)), "Type shoube a subclass of Leaf.");
+            var drawer = PersistentGUI.Caches.GetUserDrawer(obj.type);
+            drawer.target = obj;
+            drawer.OnDraw();
+        }
+
         public static void PropertyField(PersistentProperty property, params GUILayoutOption[] options)
         {
             PropertyField(new GUIContent(property.displayName), property, true, options);
@@ -22,7 +30,7 @@ namespace EGUI.Editor
         {
             Rect rect;
             var propertyType = property.type;
-            var propertyDrawer = PersistentGUI.Caches.GetDrawer(propertyType);
+            var propertyDrawer = PersistentGUI.Caches.GetPropertyDrawer(propertyType);
             if (propertyType == typeof(bool) && propertyDrawer == null)
             {
                 rect = GetToggleRect(true, options);
@@ -34,10 +42,16 @@ namespace EGUI.Editor
             PersistentGUI.PropertyField(rect, label, property, includeChildren);
         }
 
+        public static bool ToggleBar(GUIContent label, bool value)
+        {
+            var rect = EditorGUILayout.GetControlRect(false, EditorStyles.toolbarButton.fixedHeight);
+            return PersistentGUI.ToggleBar(rect, label, value);
+        }
+
         internal static Rect GetToggleRect(bool hasLabel, params GUILayoutOption[] options)
         {
             float num = 10f - EditorGUIUtility.fieldWidth;
-            return GUILayoutUtility.GetRect((!hasLabel) ? (EditorGUIUtility.fieldWidth + num) : (kLabelFloatMinW + num), kLabelFloatMaxW + num, 16f, 16f, EditorStyles.numberField, options);
+            return GUILayoutUtility.GetRect((!hasLabel) ? (EditorGUIUtility.fieldWidth + num) : (kLabelFloatMinW + num), kLabelFloatMaxW + num, EditorGUIUtility.singleLineHeight, EditorGUIUtility.singleLineHeight, EditorStyles.numberField, options);
         }
 
         internal static float kLabelFloatMinW

@@ -60,10 +60,7 @@ namespace EGUI
         private void InitCustomPersistence()
         {
             mCustomPersistenceMap = new Dictionary<Type, CustomPersistence>();
-            var baseType = typeof(CustomPersistence);
-            var customTypes = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(assembly => assembly.GetTypes())
-                .Where(t => baseType.IsAssignableFrom(t) && !t.IsAbstract);
+            var customTypes = CoreUtil.FindSubTypes(typeof(CustomPersistence));
             foreach (var type in customTypes)
             {
                 var instance = (CustomPersistence)CoreUtil.CreateInstance(type, new object[] { this });
@@ -91,7 +88,8 @@ namespace EGUI
 
         public byte[] Serialize(object obj)
         {
-            Debug.Assert(obj != null && !obj.GetType().IsInterface);
+            Debug.Assert(obj != null);
+            Debug.Assert(!obj.GetType().IsInterface);
             mLookupIdSeed = 0;
             mLookupIdMap.Clear();
             byte[] bytes = null;
@@ -111,8 +109,6 @@ namespace EGUI
                 SerializeType(obj as Type, writer);
             else if (type.IsClass)
                 SerializeReference(obj, type, writer);
-            else if (type.IsInterface)
-                SerializeReference(null, type, writer);
             else if (type.IsValueType)
                 SerializeValue(obj, type, writer);
             else
@@ -171,11 +167,7 @@ namespace EGUI
         public void SerializeTypeRecur(Type type, BinaryWriter writer)
         {
             writer.Write(type.IsGenericType);
-            if (type.IsArray)
-            {
-                writer.Write(type.FullName);
-            }
-            else if (type.IsGenericType)
+            if (type.IsGenericType)
             {
                 writer.Write(type.GetGenericTypeDefinition().FullName);
                 var genericArgs = type.GetGenericArguments();
@@ -220,10 +212,7 @@ namespace EGUI
                 }).ToList();
             }
             fields = fields.Where(f => {
-                return !f.IsLiteral && !f.IsInitOnly &&
-                    !f.FieldType.IsSubclassOf(typeof(MulticastDelegate)) &&
-                    f.FieldType != typeof(IntPtr) &&
-                    f.FieldType != typeof(UIntPtr);
+                return !f.IsLiteral && !f.IsInitOnly && CoreUtil.IsSafetyReflectionType(f.FieldType);
             }).ToList();
             writer.Write(fields.Count);
             foreach (var field in fields)
@@ -236,22 +225,20 @@ namespace EGUI
 
             var propFlags = BindingFlags.Public;
             propFlags |= (instance ? BindingFlags.Instance : BindingFlags.Static);
-            var properties = type.GetProperties(propFlags);
+            var properties = new List<PropertyInfo>();
+            CoreUtil.GetProperties(properties, type, propFlags, true);
             if (typeAttrs != null && typeAttrs.Length > 0)
             {
                 properties = properties.Where(p => {
                     var attributes = p.GetCustomAttributes(typeof(PersistentFieldAttribute), false);
                     return attributes != null && attributes.Length > 0;
-                }).ToArray();
+                }).ToList();
             }
             properties = properties.Where(p => {
                 return p.CanRead && p.CanWrite && 
-                    p.GetIndexParameters().Length == 0 &&
-                    !p.PropertyType.IsSubclassOf(typeof(MulticastDelegate)) &&
-                    p.PropertyType != typeof(IntPtr) &&
-                    p.PropertyType != typeof(UIntPtr);
-            }).ToArray();
-            writer.Write(properties.Length);
+                    p.GetIndexParameters().Length == 0 && CoreUtil.IsSafetyReflectionType(p.PropertyType);
+            }).ToList();
+            writer.Write(properties.Count);
             foreach (var property in properties)
             {
                 var val = property.GetValue(obj, null);
@@ -351,13 +338,18 @@ namespace EGUI
 
         public T Deserialize<T>(byte[] bytes)
         {
+            return (T)Deserialize(bytes);
+        }
+
+        public object Deserialize(byte[] bytes)
+        {
             mInverseLookupMap.Clear();
-            var obj = default(T);
+            object obj = null;
             using (var stream = new MemoryStream(bytes))
             {
                 stream.Seek(0, SeekOrigin.Current);
                 var reader = new BinaryReader(stream);
-                Deserialize(reader, (ret) => obj = (T)ret);
+                Deserialize(reader, ret => obj = ret);
             }
             return obj;
         }
@@ -423,7 +415,7 @@ namespace EGUI
                 var propertyName = reader.ReadString();
                 var propFlags = BindingFlags.Public;
                 propFlags |= (instance ? BindingFlags.Instance : BindingFlags.Static);
-                var property = type.GetProperty(propertyName, propFlags);
+                var property = CoreUtil.GetProperty(type, propertyName, propFlags, true);
                 Debug.Assert(property != null, type.FullName + "." + propertyName + " not exist.");
                 Debug.Assert(property.CanWrite, type.FullName + "." + propertyName + " can not be written in.");
                 Deserialize(reader, ret => {

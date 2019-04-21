@@ -21,27 +21,30 @@ namespace EGUI.Editor
 
         PersistentObject pobj;
 
+        MainFrameContainer container;
+
+        Rect size;
+
         private void OnGUI()
         {
-            if (GUILayout.Button("Test"))
-            {
+            //if (GUILayout.Button("Test"))
+            //{
                 
-            }
+            //}
             if (pobj == null)
             {
                 var node = new Node();
                 node.localPosition = new Vector2(1, 2);
                 node.name = "A";
+                node.AddLeaf<Drawer>();
+                node.AddLeaf<Text>();
                 var node1 = new Node();
                 node1.localPosition = new Vector2(1, 4);
                 node1.name = "B";
-                nodes = new Node[] { node, node1 };
+                nodes = new Node[] { node };
                 pobj = new PersistentObject(nodes);
             }
-            var prop = pobj.Find("localPosition");
-            PersistentGUILayout.PropertyField(prop);
-            var prop1 = pobj.Find("name");
-            PersistentGUILayout.PropertyField(prop1);
+            
             if (moduleBytes != null && moduleBytes.Length > 0)
             {
                 mRoot = new Persistence().Deserialize<Node>(moduleBytes);
@@ -50,14 +53,76 @@ namespace EGUI.Editor
             else if (mRoot == null)
             {
                 mRoot = new Node();
+                mRoot.size = new Vector2(position.width, position.height);
                 mRoot.AddLeaf<EGUI.UI.Canvas>();
                 mRoot.AddLeaf<EventSystem>();
-                var textfield_1 = DefaultControl.CreateTextField(mRoot);
-                textfield_1.onInputValueChanged += value => Debug.Log(value);
                 var button_2 = DefaultControl.CreateButton(mRoot);
-                button_2.node.localPosition = new Vector2(0, 100);
+                button_2.node.localPosition = new Vector2(0, 0);
             }
-            mRoot.Update();
+            if (container == null)
+            {
+                container = new MainFrameContainer();
+                container.focused = focusedWindow == this;
+                container.rect = new Rect(0, 0, position.width, position.height);
+                container.Setup(mRoot);
+            }
+            if (size.width != position.width ||
+                size.height != position.height)
+            {
+                mRoot.size = new Vector2(position.width, position.height);
+                container.rect = new Rect(0, 0, position.width, position.height);
+                size = position;
+            }
+            container.OnDraw();
+            OnCommonEvent();
+            UserCursor.Update();
+        }
+
+        private void OnCommonEvent()
+        {
+            switch (Event.current.type)
+            {
+                case EventType.MouseDown:
+                    {
+                        Event.current.Use();
+                        break;
+                    }
+                case EventType.MouseUp:
+                    {
+                        if (UserDragDrop.dragging)
+                        {
+                            UserDragDrop.StopDrag();
+                            UserCursor.ResetState();
+                            Event.current.Use();
+                        }
+                        break;
+                    }
+                case EventType.MouseDrag:
+                    {
+                        if (UserDragDrop.dragging)
+                        {
+                            if (!new Rect(0, 0, position.width, position.height).Contains(Event.current.mousePosition))
+                            {
+                                UserDragDrop.StopDrag();
+                                UserCursor.ResetState();
+                            }
+                            Event.current.Use();
+                        }
+                        break;
+                    }
+            }
+        }
+
+        private void OnFocus()
+        {
+            if (container != null)
+                container.focused = true;
+        }
+
+        private void OnLostFocus()
+        {
+            if (container != null)
+                container.focused = false;
         }
 
         private void OnEnable()

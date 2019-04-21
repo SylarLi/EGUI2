@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -24,7 +25,7 @@ namespace EGUI.Editor
 
         public MemberInfo memberInfo { get { return mMemberPath[mMemberPath.Length - 1]; } }
 
-        public string displayName { get { return EditorUtil.GetNiceDisplayName(memberInfo.Name); } }
+        public string displayName { get { return UserUtil.GetNiceDisplayName(memberInfo.Name); } }
 
         public bool hasMultipleDifferentValues
         {
@@ -35,6 +36,22 @@ namespace EGUI.Editor
             }
         }
 
+        public int length
+        {
+            get
+            {
+                return persistentObject.values.Length;
+            }
+        }
+
+        public bool exist
+        {
+            get
+            {
+                return GetValues<object>().All(i => i != null);
+            }
+        }
+
         public PersistentProperty(PersistentObject persistentObject, string propertyPath)
         {
             Debug.Assert(persistentObject != null, "PersistentObject can not be null.");
@@ -42,6 +59,11 @@ namespace EGUI.Editor
             mPersistentObject = persistentObject;
             mPropertyPath = propertyPath;
             mMemberPath = CoreUtil.FindMemberPath(persistentObject.type, propertyPath);
+            foreach (var memberInfo in mMemberPath)
+            {
+                if (memberInfo.MemberType == MemberTypes.Property)
+                    Debug.Assert(((PropertyInfo)memberInfo).CanRead);
+            }
             mType = CoreUtil.GetMemberType(memberInfo);
         }
 
@@ -57,6 +79,14 @@ namespace EGUI.Editor
                     .ToArray();
         }
 
+        public PersistentProperty[] ListChildren()
+        {
+            var members = new List<MemberInfo>();
+            UserUtil.GetDisplayedMembersInType(members, type);
+            return (from m in members
+                   select new PersistentProperty(persistentObject, propertyPath + "." + m.Name)).ToArray();
+        }
+
         public T GetValue<T>()
         {
             Debug.Assert(typeof(T).IsAssignableFrom(type), string.Format("Type missmatch, {0} : {1}.", typeof(T).Name, type.Name));
@@ -68,6 +98,69 @@ namespace EGUI.Editor
             Debug.Assert(typeof(T).IsAssignableFrom(type), string.Format("Type missmatch, {0} : {1}.", typeof(T).Name, type.Name));
             var a = persistentObject.values.Select(i => (T)CoreUtil.GetMemberValue(mMemberPath, i)).ToArray();
             return a;
+        }
+
+        public void SetValue<T>(T value)
+        {
+            Debug.Assert(typeof(T).IsAssignableFrom(type), string.Format("Type missmatch, {0} : {1}.", typeof(T).Name, type.Name));
+            foreach (var memberInfo in mMemberPath)
+            {
+                if (memberInfo.MemberType == MemberTypes.Field)
+                    Debug.Assert(!((FieldInfo)memberInfo).IsLiteral && !((FieldInfo)memberInfo).IsInitOnly);
+                else if (memberInfo.MemberType == MemberTypes.Property)
+                    Debug.Assert(((PropertyInfo)memberInfo).CanWrite);
+            }
+            var objects = persistentObject.GetValues<object>();
+            var commands = objects.Select(obj => new UpdateMemberCommand(obj, propertyPath, value)).ToArray();
+            Command.Execute(new CombinedCommand(commands));
+        }
+
+        public void SetValues<T>(T[] values)
+        {
+            Debug.Assert(typeof(T).IsAssignableFrom(type), string.Format("Type missmatch, {0} : {1}.", typeof(T).Name, type.Name));
+            foreach (var memberInfo in mMemberPath)
+            {
+                if (memberInfo.MemberType == MemberTypes.Field)
+                    Debug.Assert(!((FieldInfo)memberInfo).IsLiteral && !((FieldInfo)memberInfo).IsInitOnly);
+                else if (memberInfo.MemberType == MemberTypes.Property)
+                    Debug.Assert(((PropertyInfo)memberInfo).CanWrite);
+            }
+            var objects = persistentObject.GetValues<object>();
+            Debug.Assert(values.Length == objects.Length);
+            var commands = new UpdateMemberCommand[objects.Length];
+            for (int i = 0; i < objects.Length; i++)
+            {
+                commands[i] = new UpdateMemberCommand(objects[i], propertyPath, values[i]);
+            }
+            Command.Execute(new CombinedCommand(commands));
+        }
+
+        public void ResizeArray(int length)
+        {
+            foreach (var memberInfo in mMemberPath)
+            {
+                if (memberInfo.MemberType == MemberTypes.Field)
+                    Debug.Assert(!((FieldInfo)memberInfo).IsInitOnly);
+                else if (memberInfo.MemberType == MemberTypes.Property)
+                    Debug.Assert(((PropertyInfo)memberInfo).CanWrite);
+            }
+            var objects = persistentObject.GetValues<object>();
+            var commands = new List<UpdateMemberCommand>();
+            var arrays = GetValues<Array>();
+            for (int i = 0; i < arrays.Length; i++)
+            {
+                var array = arrays[i];
+                if (array.Length != length)
+                {
+                    var newArray = Array.CreateInstance(type.GetElementType(), length);
+                    Array.ConstrainedCopy(array, 0, newArray, 0, Mathf.Min(array.Length, length));
+                    commands.Add(new UpdateMemberCommand(objects[i], propertyPath, newArray));
+                }
+            }
+            if (commands.Count > 0)
+            {
+                Command.Execute(new CombinedCommand(commands.ToArray()));
+            }
         }
     }
 }

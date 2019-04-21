@@ -6,9 +6,12 @@ namespace EGUI
     public abstract class Leaf : Object
     {
         [PersistentField]
+        private bool mIsStart;
+
+        [PersistentField]
         private Node mNode;
 
-        public Node node { get { return mNode; } set { if (mNode != value) { mNode = value; RebuildActivation(); } } }
+        public Node node { get { return mNode; } set { if (mNode != value) { mNode = value; if (mNode == null) mIsStart = false; RebuildActivation(); } } }
 
         [PersistentField]
         private bool mEnabled = true;
@@ -18,7 +21,7 @@ namespace EGUI
         [PersistentField]
         private bool mActive;
 
-        public bool active { get { return mActive; } protected set { if (mActive != value) { mActive = value; if (mActive) OnEnable(); else OnDisable(); } } }
+        public bool active { get { return mActive; } protected set { if (mActive != value) { mActive = value; if (mActive && !mIsStart) { mIsStart = true; OnStart(); } if (mActive) OnEnable(); else OnDisable(); } } }
 
         public override void Dispose()
         {
@@ -33,6 +36,8 @@ namespace EGUI
                 node = null;
             }
         }
+
+        public virtual void OnStart() { }
 
         public virtual void OnEnable() { }
 
@@ -80,6 +85,36 @@ namespace EGUI
         public Leaf GetLeafInAncestors(Type type, bool includeInactive = true)
         {
             return node.GetLeafInAncestors(type, includeInactive);
+        }
+
+        public T[] GetLeavesInAncestors<T>(bool includeInactive)
+        {
+            return node.GetLeavesInAncestors<T>(includeInactive);
+        }
+
+        public Leaf[] GetLeavesInAncestors(Type type, bool includeInactive = true)
+        {
+            return node.GetLeavesInAncestors(type, includeInactive);
+        }
+
+        public T GetLeafInChildren<T>(bool includeInactive)
+        {
+            return node.GetLeafInChildren<T>(includeInactive);
+        }
+
+        public Leaf GetLeafInChildren(Type type, bool includeInactive)
+        {
+            return node.GetLeafInChildren(type, includeInactive);
+        }
+
+        public T[] GetLeavesInChildren<T>(bool includeInactive)
+        {
+            return node.GetLeavesInChildren<T>(includeInactive);
+        }
+
+        public Leaf[] GetLeavesInChildren(Type type, bool includeInactive)
+        {
+            return node.GetLeavesInChildren(type, includeInactive);
         }
     }
 }

@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using UnityEngine;
 
 namespace EGUI.Editor
@@ -14,6 +16,13 @@ namespace EGUI.Editor
 
         public Type type { get { return mType; } }
 
+        public PersistentObject(object value)
+        {
+            Debug.Assert(value != null, "Object can not be null.");
+            mValues = new object[] { value };
+            mType = value.GetType();
+        }
+
         public PersistentObject(object[] values)
         {
             Debug.Assert(values.Length > 0 && values.All(i => i != null), "Object can not be null.");
@@ -26,6 +35,14 @@ namespace EGUI.Editor
         public PersistentProperty Find(string propertyPath)
         {
             return new PersistentProperty(this, propertyPath);
+        }
+
+        public PersistentProperty[] ListChildren()
+        {
+            var members = new List<MemberInfo>();
+            UserUtil.GetDisplayedMembersInType(members, type);
+            return (from m in members
+                    select new PersistentProperty(this, m.Name)).ToArray();
         }
 
         public T GetValue<T>()

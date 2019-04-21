@@ -2,11 +2,31 @@
 using System.Reflection;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Linq;
+using System.Collections;
 
 namespace EGUI
 {
     public sealed class CoreUtil
     {
+        public static Type[] FindSubTypes(Type baseType, bool includeAbstract = false, bool includeInterface = false)
+        {
+            return AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(assembly => assembly.GetTypes())
+                .Where(t => baseType.IsAssignableFrom(t) && (includeAbstract || !t.IsAbstract) && (includeInterface || !t.IsInterface))
+                .ToArray();
+        }
+
+        public static bool IsSafetyReflectionType(Type type)
+        {
+            if (type.IsSubclassOf(typeof(MulticastDelegate)))
+                return false;
+            else if (type == typeof(IntPtr) ||
+                type == typeof(UIntPtr))
+                return false;
+            return true;
+        }
+
         public static object CreateInstance(Type type, object[] args = null)
         {
             if (type.IsSubclassOf(typeof(ScriptableObject)))
@@ -37,13 +57,12 @@ namespace EGUI
                     }
                 }
             }
-            if (throwOnError && type == null)
-                throw new NullReferenceException("Can not find type: " + name);
             return type;
         }
 
         public static void GetFields(ICollection<FieldInfo> fields, Type type, BindingFlags flag, bool inherit)
         {
+            flag |= BindingFlags.DeclaredOnly;
             var typeFields = type.GetFields(flag);
             foreach (var typeField in typeFields)
                 fields.Add(typeField);
@@ -53,20 +72,41 @@ namespace EGUI
 
         public static FieldInfo GetField(Type type, string name, BindingFlags flag, bool inherit)
         {
+            flag |= BindingFlags.DeclaredOnly;
             var field = type.GetField(name, flag);
             if (field == null && inherit && type.BaseType != null)
                 field = GetField(type.BaseType, name, flag, inherit);
             return field;
         }
 
-        public static MemberInfo GetMemberInfo(Type type, string name, MemberTypes memberTypes, BindingFlags flag, bool inherit)
+        public static void GetProperties(ICollection<PropertyInfo> properties, Type type, BindingFlags flag, bool inherit)
         {
+            flag |= BindingFlags.DeclaredOnly;
+            var typeProperties = type.GetProperties(flag);
+            foreach (var typeProperty in typeProperties)
+                properties.Add(typeProperty);
+            if (inherit && type.BaseType != null)
+                GetProperties(properties, type.BaseType, flag, inherit);
+        }
+
+        public static PropertyInfo GetProperty(Type type, string name, BindingFlags flag, bool inherit)
+        {
+            flag |= BindingFlags.DeclaredOnly;
+            var property = type.GetProperty(name, flag);
+            if (property == null && inherit && type.BaseType != null)
+                property = GetProperty(type.BaseType, name, flag, inherit);
+            return property;
+        }
+
+        public static MemberInfo GetMember(Type type, string name, MemberTypes memberTypes, BindingFlags flag, bool inherit)
+        {
+            flag |= BindingFlags.DeclaredOnly;
             MemberInfo member = null;
             var members = type.GetMember(name, memberTypes, flag);
             if (members.Length > 0)
                 member = members[0];
             else if (inherit && type.BaseType != null)
-                member = GetMemberInfo(type.BaseType, name, memberTypes, flag, inherit);
+                member = GetMember(type.BaseType, name, memberTypes, flag, inherit);
             return member;
         }
 
@@ -110,11 +150,11 @@ namespace EGUI
             while (type != null &&
                 index < names.Length)
             {
-                var memberInfo = GetMemberInfo(
+                var memberInfo = GetMember(
                     type,
                     names[index],
                     MemberTypes.Field | MemberTypes.Property,
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.GetField | BindingFlags.SetField | BindingFlags.GetProperty | BindingFlags.SetProperty,
+                    BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.GetField | BindingFlags.SetField | BindingFlags.GetProperty | BindingFlags.SetProperty,
                     true);
                 Debug.Assert(memberInfo != null, "Can not find member " + names[index] + " for type: " + type.FullName);
                 path[index] = memberInfo;
@@ -128,7 +168,8 @@ namespace EGUI
         {
             foreach (var memberInfo in memberPath)
             {
-                if (obj == null) break;
+                if (memberInfo.MemberType == MemberTypes.Field && !(memberInfo as FieldInfo).IsStatic && obj == null) break;
+                if (memberInfo.MemberType == MemberTypes.Property && !(memberInfo as PropertyInfo).GetAccessors(true)[0].IsStatic && obj == null) break;
                 obj = GetMemberValue(memberInfo, obj);
             }
             return obj;
@@ -151,6 +192,56 @@ namespace EGUI
                     SetMemberValue(memberPath[i - 1], list[i - 1], list[i]);
                 }
             }
+        }
+
+        public static bool LeafIsRequiredByOthers(Leaf leaf)
+        {
+            var leafType = leaf.GetType();
+            var leaves = leaf.node.GetAllLeaves();
+            return leaves.Any(i =>
+            {
+                if (i.GetType() == leafType) return false;
+                var attrs = i.GetType().GetCustomAttributes(typeof(RequireLeafAttribute), true);
+                return attrs.Any(attr => (attr as RequireLeafAttribute).type == leafType);
+            });
+        }
+
+        public static Type[] GetRequiredTypes(Type leafType)
+        {
+            var attrs = leafType.GetCustomAttributes(typeof(RequireLeafAttribute), true);
+            return (from attr in attrs
+                    select (attr as RequireLeafAttribute).type).ToArray();
+        }
+
+        public static bool CompareIList(IList list1, IList list2)
+        {
+            if (list1 == list2)
+            {
+                return true;
+            }
+            else if (list1 != null && list2 != null)
+            {
+                if (list1.Count != list2.Count)
+                {
+                    return false;
+                }
+                for (int i = 0; i < list1.Count; i++)
+                {
+                    if (list1[i] != list2[i])
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            return false;
+        }
+
+        public static T[] CopyArray<T>(T[] array)
+        {
+            var newArray = new T[array.Length];
+            Array.Copy(array, newArray, newArray.Length);
+            return newArray;
         }
     }
 }

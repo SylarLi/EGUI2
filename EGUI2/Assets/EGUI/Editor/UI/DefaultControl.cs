@@ -8,10 +8,18 @@ namespace EGUI.UI
         private static Color DefaultPressedTintColor = new Color(0.8f, 0.8f, 0.8f, 1f);
         private static Color DefaultDisabledTintColor = new Color(0.8f, 0.8f, 0.8f, 0.5f);
 
+        public static Node CreateNode(Node parent)
+        {
+            var node = new Node();
+            node.name = "Node";
+            node.parent = parent;
+            return node;
+        }
+
         public static Image CreateImage(Node parent)
         {
             var node = new Node();
-            node.name = "image";
+            node.name = "Image";
             node.parent = parent;
             node.size = new Vector2(100, 100);
             node.AddLeaf<Drawer>();
@@ -22,12 +30,12 @@ namespace EGUI.UI
         public static Text CreateText(Node parent)
         {
             var node = new Node();
-            node.name = "text";
+            node.name = "Text";
             node.parent = parent;
             node.size = new Vector2(100, 16);
             node.AddLeaf<Drawer>();
             var text = node.AddLeaf<Text>();
-            text.text = "text";
+            text.text = "Text";
             text.color = DefaultTextColor;
             return text;
         }
@@ -36,7 +44,7 @@ namespace EGUI.UI
         {
             var image = CreateImage(parent);
             var node = image.node;
-            node.name = "button";
+            node.name = "Button";
             node.size = new Vector2(60, 25);
             var button = node.AddLeaf<Button>();
             button.targetGraphic = image;
@@ -48,7 +56,7 @@ namespace EGUI.UI
                 pressedColor = DefaultPressedTintColor,
                 disabledColor = DefaultDisabledTintColor,
             };
-            var style = GUI.skin.button;
+            var style = GUIProxy.skin.button;
             var border = new Vector4(style.border.left, style.border.bottom, style.border.right, style.border.top);
             var normalState = style.normal;
             var normalSprite = CreateSprite(normalState.background, border);
@@ -60,7 +68,7 @@ namespace EGUI.UI
             };
             image.sprite = normalSprite;
             var text = CreateText(button.node);
-            text.text = "button";
+            text.text = "Button";
             text.alignment = TextAnchor.MiddleCenter;
             text.node.stretchWidth = true;
             text.node.stretchHeight = true;
@@ -72,7 +80,7 @@ namespace EGUI.UI
         public static Toggle CreateToggle(Node parent, Selectable.Transition transition = Selectable.Transition.SpriteSwap)
         {
             var node = new Node();
-            node.name = "toggle";
+            node.name = "Toggle";
             node.parent = parent;
             node.size = new Vector2(100, 16);
             var toggle = node.AddLeaf<Toggle>();
@@ -84,16 +92,15 @@ namespace EGUI.UI
                 pressedColor = DefaultPressedTintColor,
                 disabledColor = DefaultDisabledTintColor,
             };
-            var style = GUI.skin.toggle;
+            var style = GUIProxy.skin.toggle;
             var border = new Vector4(style.border.left, style.border.bottom, style.border.right, style.border.top);
             var normalState = style.normal;
             var normalSprite = CreateSprite(normalState.background, border);
             var pressedState = style.active;
             var pressedSprite = CreateSprite(pressedState.background, border);
             var bg = CreateImage(node);
-            bg.node.name = "background";
+            bg.node.name = "Background";
             bg.sprite = normalSprite;
-            Debug.Log(normalSprite.rect.width + " : " + normalSprite.rect.height);
             bg.SetNativeSize();
             toggle.targetGraphic = bg;
             toggle.spriteState = new Selectable.SpriteState()
@@ -101,12 +108,12 @@ namespace EGUI.UI
                 pressedSprite = pressedSprite
             };
             var mark = CreateImage(bg.node);
-            mark.node.name = "checkmark";
+            mark.node.name = "Checkmark";
             mark.sprite = DefaultResource.GetToggleCheckmarkSprite();
             mark.SetNativeSize();
             toggle.toggleGraphic = mark;
             var text = CreateText(node);
-            text.text = "toggle";
+            text.text = "Toggle";
             text.alignment = TextAnchor.UpperLeft;
             text.node.stretchWidth = true;
             text.node.stretchHeight = true;
@@ -118,12 +125,12 @@ namespace EGUI.UI
         public static TextField CreateTextField(Node parent)
         {
             var node = new Node();
-            node.name = "textfield";
+            node.name = "Textfield";
             node.parent = parent;
             node.size = new Vector2(100, 16);
             node.AddLeaf<Drawer>();
             var textfield = node.AddLeaf<TextField>();
-            textfield.text = "textfield";
+            textfield.text = "Textfield";
             textfield.color = DefaultTextColor;
             return textfield;
         }

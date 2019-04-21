@@ -11,7 +11,7 @@ namespace EGUI
 
         public RequireLeafAttribute(Type type)
         {
-            Debug.Assert(type.IsAssignableFrom(typeof(Leaf)));
+            Debug.Assert(type.IsSubclassOf(typeof(Leaf)));
             mType = type;
         }
     }

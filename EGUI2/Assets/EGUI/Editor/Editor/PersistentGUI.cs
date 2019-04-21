@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 using UnityEditor;
 
@@ -14,111 +15,102 @@ namespace EGUI.Editor
 
         private static Stack<bool> s_MixedValueStack = new Stack<bool>();
 
-        public static void LabelField(Rect position, GUIContent label, GUIContent label2, GUIStyle style)
+        private static Stack<Color> s_ColorStack = new Stack<Color>();
+
+        private static Stack<bool> s_WideModeStack = new Stack<bool>();
+
+        private static Stack<Color> h_ColorStack = new Stack<Color>();
+
+        private static Stack<Matrix4x4> s_MatrixStack = new Stack<Matrix4x4>();
+
+        public static void DrawAAPolyLine(Rect rect, float width, Color color)
         {
-            EditorGUI.LabelField(position, label, label2, style);
+            BeginHandlesColor(color);
+            Handles.DrawAAPolyLine(width,
+                new Vector3(rect.x, rect.y, 0),
+                new Vector3(rect.xMax, rect.y, 0),
+                new Vector3(rect.xMax, rect.yMax, 0),
+                new Vector3(rect.x, rect.yMax, 0),
+                new Vector3(rect.x, rect.y, 0));
+            EndHandlesColor();
         }
 
-        public static bool Toggle(Rect position, GUIContent label, bool value, GUIStyle style)
+        public static bool ToggleBar(Rect position, GUIContent label, bool value)
         {
-            return EditorGUI.Toggle(position, label, value, style);
+            var controlId = GUIUtility.GetControlID(FocusType.Passive);
+            var eventType = Event.current.GetTypeForControl(controlId);
+            switch (eventType)
+            {
+                case EventType.Repaint:
+                    {
+                        EditorStyles.toolbarButton.Draw(position, GUIContent.none, controlId, value);
+                        var height = EditorStyles.foldout.CalcHeight(label, position.width);
+                        EditorStyles.foldout.Draw(new Rect(position.x + 5, position.y + (position.height - height) * 0.5f, position.width, height), label, controlId, value);
+                        break;
+                    }
+                case EventType.MouseDown:
+                    {
+                        if (position.Contains(Event.current.mousePosition))
+                        {
+                            value = !value;
+                            Event.current.Use();
+                        }
+                        break;
+                    }
+            }
+            return value;
         }
 
-        public static int IntField(Rect position, GUIContent label, int value, GUIStyle style)
+        public static void PropertyField(Rect position, GUIContent label, PersistentProperty property)
         {
-            return EditorGUI.IntField(position, label, value, style);
-        }
-
-        public static long LongField(Rect position, GUIContent label, long value, GUIStyle style)
-        {
-            return EditorGUI.LongField(position, label, value, style);
-        }
-
-        public static float FloatField(Rect position, GUIContent label, float value, GUIStyle style)
-        {
-            return EditorGUI.FloatField(position, label, value, style);
-        }
-
-        public static double DoubleField(Rect position, GUIContent label, double value, GUIStyle style)
-        {
-            return EditorGUI.DoubleField(position, label, value, style);
-        }
-
-        public static string TextField(Rect position, GUIContent label, string value, GUIStyle style)
-        {
-            return EditorGUI.TextField(position, label, value, style);
-        }
-
-        public static Enum EnumPopup(Rect position, GUIContent label, Enum value, GUIStyle style)
-        {
-            return EditorGUI.EnumPopup(position, label, value, style);
-        }
-
-        public static UnityEngine.Object ObjectField(Rect position, GUIContent label, UnityEngine.Object value, Type type, bool allowSceneObjects)
-        {
-            return EditorGUI.ObjectField(position, label, value, type, allowSceneObjects);
-        }
-
-        public static Color ColorField(Rect position, GUIContent label, Color value)
-        {
-            return EditorGUI.ColorField(position, label, value);
-        }
-
-        public static AnimationCurve CurveField(Rect position, GUIContent label, AnimationCurve value)
-        {
-            return EditorGUI.CurveField(position, label, value);
-        }
-
-        public static bool Foldout(Rect position, GUIContent label, bool foldout)
-        {
-            return EditorGUI.Foldout(position, foldout, label, true);
-        }
-
-        public static Vector2 Vector2Field(Rect position, GUIContent label, Vector2 value)
-        {
-            return EditorGUI.Vector2Field(position, label, value);
-        }
-
-        public static Vector3 Vector3Field(Rect position, GUIContent label, Vector3 value)
-        {
-            return EditorGUI.Vector3Field(position, label, value);
-        }
-
-        public static Vector4 Vector4Field(Rect position, GUIContent label, Vector4 value)
-        {
-            return EditorGUI.Vector4Field(position, label, value);
-        }
-
-        public static Rect RectField(Rect position, GUIContent label, Rect value)
-        {
-            return EditorGUI.RectField(position, label, value);
-        }
-
-        public static Bounds BoundsField(Rect position, GUIContent label, Bounds value)
-        {
-            return EditorGUI.BoundsField(position, label, value);
+            PropertyField(position, label, property, false);
         }
 
         public static void PropertyField(Rect position, GUIContent label, PersistentProperty property, bool includeChildren)
         {
             var propertyType = property.type;
-            var propertyDrawer = Caches.GetDrawer(propertyType);
-            if (propertyDrawer != null)
-            {
-                var foldoutLabel = new GUIContent(property.displayName);
-                var foldout = Foldout(position, foldoutLabel, Caches.GetFoldout(property));
-                Caches.SetFoldout(property, foldout);
-                if (includeChildren && foldout)
-                {
-                    var propertyRect = position;
-                    propertyRect.y += EditorGUIUtility.singleLineHeight;
-                    propertyRect.height = propertyDrawer.GetPropertyHeight(property, label);
-                    propertyDrawer.OnGUI(propertyRect, property, label);
-                }
-            }
-            else if (Caches.IsDefaultPropertyType(propertyType))
+            if (Caches.IsDefaultPropertyType(propertyType))
             {
                 DefaultPropertyField(position, label, property);
+            }
+            else
+            {
+                var propertyRect = position;
+                propertyRect.height = EditorGUIUtility.singleLineHeight;
+                if (!property.exist)
+                {
+                    BeginColor(Color.yellow);
+                    EditorGUI.LabelField(propertyRect, label, new GUIContent("NULL"));
+                    EndColor();
+                }
+                else
+                {
+                    var propertyDrawer = Caches.GetPropertyDrawer(propertyType);
+                    if (propertyDrawer != null)
+                    {
+                        propertyDrawer.OnGUI(position, property, label);
+                    }
+                    else
+                    {
+                        var foldout = EditorGUI.Foldout(propertyRect, Caches.GetFoldout(property), label);
+                        Caches.SetFoldout(property, foldout);
+                        if (includeChildren && foldout)
+                        {
+                            propertyRect.y += EditorGUIUtility.singleLineHeight;
+                            var children = property.ListChildren();
+                            EditorGUI.indentLevel += 1;
+                            foreach (var child in children)
+                            {
+                                var childLabel = new GUIContent(child.displayName);
+                                propertyRect.y += EditorGUIUtility.standardVerticalSpacing;
+                                PropertyField(propertyRect, childLabel, child, includeChildren);
+                                propertyRect.y += GetPropertyHeight(childLabel, child, includeChildren);
+                            }
+                            EditorGUI.indentLevel -= 1;
+                        }
+                    }
+                }
+                
             }
         }
 
@@ -174,7 +166,7 @@ namespace EGUI.Editor
             position.height = EditorGUIUtility.singleLineHeight;
             MultiPropertyField(position, new GUIContent[] { new GUIContent("X"), new GUIContent("Y") }, property.Find(new string[] { "x", "y" }));
             position.y += EditorGUIUtility.singleLineHeight;
-            MultiPropertyField(position, new GUIContent[] { new GUIContent("Z"), new GUIContent("W") }, property.Find(new string[] { "z", "w" }));
+            MultiPropertyField(position, new GUIContent[] { new GUIContent("W"), new GUIContent("H") }, property.Find(new string[] { "width", "height" }));
         }
 
         internal static void BoundsField(Rect position, GUIContent label, PersistentProperty property)
@@ -247,6 +239,78 @@ namespace EGUI.Editor
             return result;
         }
 
+        internal static object DefaultTypeField(Rect position, GUIContent label, object value)
+        {
+            object updateValue = null;
+            var propertyType = value.GetType();
+            if (propertyType == typeof(Vector2))
+            {
+                updateValue = EditorGUI.Vector2Field(position, label, (Vector2)value);
+            }
+            else if (propertyType == typeof(Vector3))
+            {
+                updateValue = EditorGUI.Vector3Field(position, label, (Vector3)value);
+            }
+            else if (propertyType == typeof(Vector4))
+            {
+                updateValue = EditorGUI.Vector4Field(position, label, (Vector4)value);
+            }
+            else if (propertyType == typeof(Rect))
+            {
+                updateValue = EditorGUI.RectField(position, label, (Rect)value);
+            }
+            else if (propertyType == typeof(Bounds))
+            {
+                updateValue = EditorGUI.BoundsField(position, label, (Bounds)value);
+            }
+            else if(propertyType == typeof(bool))
+            {
+                updateValue = EditorGUI.Toggle(position, label, (bool)value);
+            }
+            else if (propertyType == typeof(int))
+            {
+                updateValue = EditorGUI.IntField(position, label, (int)value);
+            }
+            else if (propertyType == typeof(long))
+            {
+                updateValue = EditorGUI.LongField(position, label, (long)value);
+            }
+            else if (propertyType == typeof(float))
+            {
+                updateValue = EditorGUI.FloatField(position, label, (float)value);
+            }
+            else if (propertyType == typeof(double))
+            {
+                updateValue = EditorGUI.DoubleField(position, label, (double)value);
+            }
+            else if (propertyType == typeof(string))
+            {
+                updateValue = EditorGUI.TextField(position, label, (string)value);
+            }
+            else if (propertyType == typeof(Color) ||
+                propertyType == typeof(Color32))
+            {
+                updateValue = EditorGUI.ColorField(position, label, (Color)value);
+            }
+            else if (propertyType == typeof(UnityEngine.Object) || propertyType.IsSubclassOf(typeof(UnityEngine.Object)))
+            {
+                updateValue = EditorGUI.ObjectField(position, label, (UnityEngine.Object)value, propertyType, false);
+            }
+            else if (propertyType == typeof(AnimationCurve))
+            {
+                updateValue = EditorGUI.CurveField(position, label, (AnimationCurve)value);
+            }
+            else if (propertyType.IsEnum)
+            {
+                updateValue = EditorGUI.EnumPopup(position, label, (Enum)value);
+            }
+            else
+            {
+                throw new NotSupportedException("Invalide default type: " + propertyType.FullName);
+            }
+            return updateValue;
+        }
+
         internal static void DefaultPropertyField(Rect position, GUIContent label, PersistentProperty property)
         {
             var propertyType = property.type;
@@ -278,44 +342,44 @@ namespace EGUI.Editor
                 EditorGUI.BeginChangeCheck();
                 if (propertyType == typeof(bool))
                 {
-                    updateValue = Toggle(position, label, (bool)propertyValue, EditorStyles.toggle);
+                    updateValue = EditorGUI.Toggle(position, label, (bool)propertyValue);
                 }
                 else if (propertyType == typeof(int))
                 {
-                    updateValue = IntField(position, label, (int)propertyValue, EditorStyles.numberField);
+                    updateValue = EditorGUI.IntField(position, label, (int)propertyValue);
                 }
                 else if (propertyType == typeof(long))
                 {
-                    updateValue = LongField(position, label, (long)propertyValue, EditorStyles.numberField);
+                    updateValue = EditorGUI.LongField(position, label, (long)propertyValue);
                 }
                 else if (propertyType == typeof(float))
                 {
-                    updateValue = FloatField(position, label, (float)propertyValue, EditorStyles.numberField);
+                    updateValue = EditorGUI.FloatField(position, label, (float)propertyValue);
                 }
                 else if (propertyType == typeof(double))
                 {
-                    updateValue = DoubleField(position, label, (double)propertyValue, EditorStyles.numberField);
+                    updateValue = EditorGUI.DoubleField(position, label, (double)propertyValue);
                 }
                 else if (propertyType == typeof(string))
                 {
-                    updateValue = TextField(position, label, (string)propertyValue, EditorStyles.textField);
+                    updateValue = EditorGUI.TextField(position, label, (string)propertyValue);
                 }
                 else if (propertyType == typeof(Color) ||
                     propertyType == typeof(Color32))
                 {
-                    updateValue = ColorField(position, label, (Color)propertyValue);
+                    updateValue = EditorGUI.ColorField(position, label, (Color)propertyValue);
                 }
                 else if (propertyType == typeof(UnityEngine.Object) || propertyType.IsSubclassOf(typeof(UnityEngine.Object)))
                 {
-                    updateValue = ObjectField(position, label, (UnityEngine.Object)propertyValue, propertyType, false);
+                    updateValue = EditorGUI.ObjectField(position, label, (UnityEngine.Object)propertyValue, propertyType, false);
                 }
                 else if (propertyType == typeof(AnimationCurve))
                 {
-                    updateValue = CurveField(position, label, (AnimationCurve)propertyValue);
+                    updateValue = EditorGUI.CurveField(position, label, (AnimationCurve)propertyValue);
                 }
                 else if (propertyType.IsEnum)
                 {
-                    updateValue = EnumPopup(position, label, (Enum)propertyValue, EditorStyles.popup);
+                    updateValue = EditorGUI.EnumPopup(position, label, (Enum)propertyValue);
                 }
                 else
                 {
@@ -323,9 +387,7 @@ namespace EGUI.Editor
                 }
                 if (EditorGUI.EndChangeCheck())
                 {
-                    var objects = property.persistentObject.GetValues<object>();
-                    var commands = objects.Select(obj => new UpdateMemberCommand(obj, property.propertyPath, updateValue)).ToArray();
-                    Command.Execute(new CombinedCommand(commands));
+                    property.SetValue(updateValue);
                 }
                 EndShowMixedValue();
             }
@@ -335,34 +397,83 @@ namespace EGUI.Editor
         {
             var height = 0f;
             var propertyType = property.type;
-            var propertyDrawer = Caches.GetDrawer(propertyType);
+            var propertyDrawer = Caches.GetPropertyDrawer(propertyType);
             if (propertyDrawer != null)
             {
-                height += EditorGUIUtility.singleLineHeight;
-                if (includeChildren && Caches.GetFoldout(property))
-                {
-                    height += propertyDrawer.GetPropertyHeight(property, label);
-                }
+                height += propertyDrawer.GetHeight(property, label);
             }
-            else if (propertyType == typeof(Vector2) ||
-                propertyType == typeof(Vector3) ||
-                propertyType == typeof(Vector4))
+            else if (Caches.IsDefaultPropertyType(propertyType))
             {
-                height += ((LabelHasContent(label) && !EditorGUIUtility.wideMode) ? EditorGUIUtility.singleLineHeight : 0f) + EditorGUIUtility.singleLineHeight;
-            }
-            else if (propertyType == typeof(Rect))
-            {
-                height += ((LabelHasContent(label) && !EditorGUIUtility.wideMode) ? EditorGUIUtility.singleLineHeight : 0f) + EditorGUIUtility.singleLineHeight * 2;
-            }
-            else if (propertyType == typeof(Bounds))
-            {
-                height += (LabelHasContent(label) ? EditorGUIUtility.singleLineHeight : 0f) + EditorGUIUtility.singleLineHeight * 2;
+                return GetDefaultTypeHeight(label, propertyType);
             }
             else
             {
                 height += EditorGUIUtility.singleLineHeight;
+                var foldout = Caches.GetFoldout(property);
+                if (property.exist && includeChildren && foldout)
+                {
+                    var children = property.ListChildren();
+                    foreach (var child in children)
+                    {
+                        var childLabel = new GUIContent(child.displayName);
+                        height += EditorGUIUtility.standardVerticalSpacing;
+                        height += GetPropertyHeight(childLabel, child, includeChildren);
+                    }
+                }
             }
             return height;
+        }
+
+        internal static float GetDefaultTypeHeight(GUIContent label, Type propertyType)
+        {
+            var height = 0f;
+            if (propertyType == typeof(Vector2) ||
+                propertyType == typeof(Vector3) ||
+                propertyType == typeof(Vector4))
+            {
+                height = ((LabelHasContent(label) && !EditorGUIUtility.wideMode) ? EditorGUIUtility.singleLineHeight : 0f) + EditorGUIUtility.singleLineHeight;
+            }
+            else if (propertyType == typeof(Rect))
+            {
+                height = ((LabelHasContent(label) && !EditorGUIUtility.wideMode) ? EditorGUIUtility.singleLineHeight : 0f) + EditorGUIUtility.singleLineHeight * 2;
+            }
+            else if (propertyType == typeof(Bounds))
+            {
+                height = (LabelHasContent(label) ? EditorGUIUtility.singleLineHeight : 0f) + EditorGUIUtility.singleLineHeight * 2;
+            }
+            else
+            {
+                height = EditorGUIUtility.singleLineHeight;
+            }
+            return height;
+        }
+
+        internal static void BeginMatrix(Matrix4x4 matrix)
+        {
+            s_MatrixStack.Push(GUI.matrix);
+            GUI.matrix = matrix;
+        }
+
+        internal static void EndMatrix()
+        {
+            if (s_MatrixStack.Count > 0)
+            {
+                GUI.matrix = s_MatrixStack.Pop();
+            }
+        }
+
+        internal static void BeginColor(Color color)
+        {
+            s_ColorStack.Push(GUI.color);
+            GUI.color = color;
+        }
+
+        internal static void EndColor()
+        {
+            if (s_ColorStack.Count > 0)
+            {
+                GUI.color = s_ColorStack.Pop();
+            }
         }
 
         internal static void BeginDisabled(bool disabled)
@@ -379,6 +490,20 @@ namespace EGUI.Editor
             }
         }
 
+        internal static void BeginWideMode(bool wideMode)
+        {
+            s_WideModeStack.Push(EditorGUIUtility.wideMode);
+            EditorGUIUtility.wideMode = wideMode;
+        }
+
+        internal static void EndWideMode()
+        {
+            if (s_WideModeStack.Count > 0)
+            {
+                EditorGUIUtility.wideMode = s_WideModeStack.Pop();
+            }
+        }
+
         internal static void BeginShowMixedValue(bool showMixedValue)
         {
             s_MixedValueStack.Push(EditorGUI.showMixedValue);
@@ -388,6 +513,20 @@ namespace EGUI.Editor
         internal static void EndShowMixedValue()
         {
             EditorGUI.showMixedValue = s_MixedValueStack.Pop();
+        }
+
+        internal static void BeginHandlesColor(Color color)
+        {
+            h_ColorStack.Push(Handles.color);
+            Handles.color = color;
+        }
+
+        internal static void EndHandlesColor()
+        {
+            if (h_ColorStack.Count > 0)
+            {
+                Handles.color = h_ColorStack.Pop();
+            }
         }
 
         internal static bool LabelHasContent(GUIContent label)
@@ -403,15 +542,24 @@ namespace EGUI.Editor
             }
         }
 
+        internal static bool IsDefaultPropertyType(Type propertyType)
+        {
+            return Caches.IsDefaultPropertyType(propertyType);
+        }
+
         internal static CacheData Caches = new CacheData();
 
         internal class CacheData
         {
             private HashSet<Type> mDefaultPropertyType = new HashSet<Type>();
 
-            private Dictionary<Type, PropertyDrawer> mDrawers = new Dictionary<Type, PropertyDrawer>();
+            private Dictionary<Type, UserPropertyDrawer> mPropertyDrawers = new Dictionary<Type, UserPropertyDrawer>();
+
+            private Dictionary<Type, UserDrawer> mUserDrawers = new Dictionary<Type, UserDrawer>();
 
             private List<FoldData> mFoldouts = new List<FoldData>();
+
+            private Dictionary<Node, bool> mHierarchyFoldouts = new Dictionary<Node, bool>();
 
             public bool IsDefaultPropertyType(Type propertyType)
             {
@@ -438,30 +586,65 @@ namespace EGUI.Editor
                     propertyType.IsSubclassOf(typeof(UnityEngine.Object));
             }
 
-            public PropertyDrawer GetDrawer(Type propertyType)
+            public UserPropertyDrawer GetPropertyDrawer(Type propertyType)
             {
-                PropertyDrawer drawer = null;
-                var attributes = propertyType.GetCustomAttributes(typeof(CustomDrawerAttribute), true);
-                var drawerType = attributes.Length > 0 ? (attributes[0] as CustomDrawerAttribute).type : null;
-                if (drawerType != null)
+                UserPropertyDrawer drawer = null;
+                if (mPropertyDrawers.Count == 0)
                 {
-                    if (!mDrawers.ContainsKey(drawerType))
+                    var customTypes = CoreUtil.FindSubTypes(typeof(UserPropertyDrawer));
+                    foreach (var type in customTypes)
                     {
-                        mDrawers.Add(drawerType, (PropertyDrawer)Activator.CreateInstance(drawerType));
+                        var attributes = type.GetCustomAttributes(typeof(UserPropertyDrawerAttribute), true);
+                        var drawerType = attributes.Length > 0 ? (attributes[0] as UserPropertyDrawerAttribute).type : null;
+                        if (drawerType != null)
+                        {
+                            var instance = (UserPropertyDrawer)CoreUtil.CreateInstance(type, null);
+                            mPropertyDrawers.Add(drawerType, instance);
+                        }
                     }
-                    drawer = mDrawers[drawerType];
+                }
+                if (propertyType.IsArray)
+                {
+                    drawer = mPropertyDrawers[typeof(Array)];
+                }
+                else if (mPropertyDrawers.ContainsKey(propertyType))
+                {
+                    drawer = mPropertyDrawers[propertyType];
                 }
                 return drawer;
             }
 
+            public UserDrawer GetUserDrawer(Type leafType)
+            {
+                if (mUserDrawers.Count == 0)
+                {
+                    var customTypes = CoreUtil.FindSubTypes(typeof(UserDrawer));
+                    foreach (var type in customTypes)
+                    {
+                        var attributes = type.GetCustomAttributes(typeof(UserDrawerAttribute), true);
+                        var drawerType = attributes.Length > 0 ? (attributes[0] as UserDrawerAttribute).type : null;
+                        if (drawerType != null)
+                        {
+                            var instance = (UserDrawer)CoreUtil.CreateInstance(type, null);
+                            mUserDrawers.Add(drawerType, instance);
+                        }
+                    }
+                }
+                if (!mUserDrawers.ContainsKey(leafType))
+                {
+                    mUserDrawers.Add(leafType, new UserDrawer());
+                }
+                return mUserDrawers[leafType];
+            }
+
             public bool GetFoldout(PersistentProperty persistentProperty)
             {
-                var ret = mFoldouts.Find(i => i.persistentObject == persistentProperty.persistentObject && i.propertyPath == persistentProperty.propertyPath);
+                var ret = mFoldouts.Find(i => i.objectType == persistentProperty.persistentObject.type && i.propertyPath == persistentProperty.propertyPath);
                 if (ret == null)
                 {
                     ret = new FoldData()
                     {
-                        persistentObject = persistentProperty.persistentObject,
+                        objectType = persistentProperty.persistentObject.type,
                         propertyPath = persistentProperty.propertyPath
                     };
                     mFoldouts.Add(ret);
@@ -471,16 +654,26 @@ namespace EGUI.Editor
 
             public void SetFoldout(PersistentProperty persistentProperty, bool foldout)
             {
-                var ret = mFoldouts.Find(i => i.persistentObject == persistentProperty.persistentObject && i.propertyPath == persistentProperty.propertyPath);
+                var ret = mFoldouts.Find(i => i.objectType == persistentProperty.persistentObject.type && i.propertyPath == persistentProperty.propertyPath);
                 if (ret != null)
                 {
                     ret.foldout = foldout;
                 }
             }
 
+            public bool GetHierarchyFoldout(Node node)
+            {
+                return mHierarchyFoldouts.ContainsKey(node) ? mHierarchyFoldouts[node] : false;
+            }
+
+            public void SetHierarchyFoldout(Node node, bool foldout)
+            {
+                mHierarchyFoldouts[node] = foldout;
+            }
+
             private class FoldData
             {
-                public PersistentObject persistentObject;
+                public Type objectType;
 
                 public string propertyPath;
 

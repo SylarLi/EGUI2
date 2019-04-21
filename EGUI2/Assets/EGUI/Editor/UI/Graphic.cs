@@ -9,7 +9,7 @@ namespace EGUI.UI
     {
         private Canvas mCanvas;
 
-        protected Canvas canvas { get { if (mCanvas == null) mCanvas = GetLeafInAncestors<Canvas>(); return mCanvas; } }
+        protected Canvas canvas { get { if (mCanvas == null) mCanvas = GetLeaf<Canvas>(); if (mCanvas == null) mCanvas = GetLeafInAncestors<Canvas>(); return mCanvas; } }
 
         private Drawer mDrawer;
 
@@ -63,19 +63,28 @@ namespace EGUI.UI
             drawer.enabled = false;
         }
 
+        public override void OnStart()
+        {
+            if (canvas != null)
+                canvas.MarkRebuildDrawingList();
+        }
+
         public override void OnNodeParentChanged()
         {
-            canvas.MarkRebuildDrawingList();
+            if (canvas != null)
+                canvas.MarkRebuildDrawingList();
         }
 
         public override void OnNodeSiblingIndexChanged()
         {
-            canvas.MarkRebuildDrawingList();
+            if (canvas != null)
+                canvas.MarkRebuildDrawingList();
         }
 
         public override void OnDestroy()
         {
-            canvas.MarkRebuildDrawingList();
+            if (canvas != null)
+                canvas.MarkRebuildDrawingList();
         }
 
         public void SetStyleDirty()

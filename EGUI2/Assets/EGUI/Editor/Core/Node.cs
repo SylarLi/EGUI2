@@ -397,9 +397,12 @@ namespace EGUI
                     {
                         mParent.AddChild(this);
                     }
-                    SetMatrixDirty();
-                    RebuildActivation();
-                    OnParentChanged();
+                    if (!disposed)
+                    {
+                        SetMatrixDirty();
+                        RebuildActivation();
+                        OnParentChanged();
+                    }
                 }
             }
         }
@@ -521,13 +524,20 @@ namespace EGUI
         {
             if (parent != null)
             {
-                index = Mathf.Clamp(index, 0, parent.childCount);
+                index = index < 0 ? parent.childCount - 1 : index;
+                index = Mathf.Clamp(index, 0, parent.childCount - 1);
                 int current = GetSiblingIndex();
                 if (current != index)
                 {
-                    parent.RemoveChild(current);
-                    if (index > current) index -= 1;
-                    parent.AddChild(this, index);
+                    for (int i = current; i < index; i++)
+                    {
+                        parent.mChildren[i] = parent.mChildren[i + 1];
+                    }
+                    for (int i = current; i > index; i--)
+                    {
+                        parent.mChildren[i] = parent.mChildren[i - 1];
+                    }
+                    parent.mChildren[index] = this;
                     OnSiblingIndexChanged();
                 }
             }
@@ -540,7 +550,14 @@ namespace EGUI
 
         public void SetAsLastSibling()
         {
-            SetSiblingIndex(parent.childCount);
+            SetSiblingIndex(-1);
+        }
+
+        public bool IsAncestorOf(Node node)
+        {
+            node = node.parent;
+            while (node != null && node != this) { node = node.parent; }
+            return node != null;
         }
 
         protected void OnParentChanged()
@@ -614,22 +631,83 @@ namespace EGUI
 
         public T GetLeafInAncestors<T>(bool includeInactive = true)
         {
-            var leaf = GetLeaf<T>(includeInactive);
-            if (leaf == null && parent != null)
-            {
-                leaf = parent.GetLeafInAncestors<T>(includeInactive);
-            }
-            return leaf;
+            return (T)(object)GetLeafInAncestors(typeof(T), includeInactive);
         }
 
         public Leaf GetLeafInAncestors(Type type, bool includeInactive = true)
         {
-            var leaf = GetLeaf(type, includeInactive);
-            if (leaf == null && parent != null)
+            Leaf leaf = null;
+            var node = parent;
+            while (node != null && leaf == null)
             {
-                leaf = parent.GetLeafInAncestors(type, includeInactive);
+                leaf = node.GetLeaf(type, includeInactive);
+                node = node.parent;
             }
             return leaf;
+        }
+
+        public T[] GetLeavesInAncestors<T>(bool includeInactive)
+        {
+            return Array.ConvertAll(GetLeavesInAncestors(typeof(T), includeInactive), i => (T)(object)i);
+        }
+
+        public Leaf[] GetLeavesInAncestors(Type type, bool includeInactive = true)
+        {
+            List<Leaf> leaves = new List<Leaf>();
+            var node = parent;
+            while (node != null)
+            {
+                var leaf = parent.GetLeaf(type, includeInactive);
+                if (leaf != null)
+                {
+                    leaves.Add(leaf);
+                }
+                node = node.parent;
+            }
+            return leaves.ToArray();
+        }
+
+        public T GetLeafInChildren<T>(bool includeInactive)
+        {
+            return (T)(object)GetLeafInChildren(typeof(T), includeInactive);
+        }
+
+        public Leaf GetLeafInChildren(Type type, bool includeInactive)
+        {
+            Leaf leaf = null;
+            foreach (var child in mChildren)
+            {
+                leaf = child.GetLeaf(type, includeInactive);
+                if (leaf == null)
+                {
+                    leaf = child.GetLeafInChildren(type, includeInactive);
+                }
+                if (leaf != null)
+                {
+                    break;
+                }
+            }
+            return leaf;
+        }
+
+        public T[] GetLeavesInChildren<T>(bool includeInactive)
+        {
+            return Array.ConvertAll(GetLeavesInChildren(typeof(T), includeInactive), i => (T)(object)i);
+        }
+
+        public Leaf[] GetLeavesInChildren(Type type, bool includeInactive)
+        {
+            List<Leaf> leaves = new List<Leaf>();
+            foreach (var child in mChildren)
+            {
+                var leaf = child.GetLeaf(type, includeInactive);
+                if (leaf != null)
+                {
+                    leaves.Add(leaf);
+                }
+                leaves.AddRange(child.GetLeavesInChildren(type, includeInactive));
+            }
+            return leaves.ToArray();
         }
 
         internal void RemoveLeaf<T>() where T : Leaf
@@ -707,6 +785,24 @@ namespace EGUI
         public static Matrix4x4 BuildWorld2LocalMatrix(Node node)
         {
             return BuildLocal2WorldMatrix(node).inverse;
+        }
+
+        public static Matrix4x4 BuildLocal2WorldRotateMatrix(Node node)
+        {
+            var stack = new Stack<Node>();
+            var current = node;
+            while (current != null)
+            {
+                stack.Push(current);
+                current = current.parent;
+            }
+            var matrix = Matrix4x4.identity;
+            while (stack.Count > 0)
+            {
+                var item = stack.Pop();
+                matrix = matrix * Matrix4x4.TRS(Vector3.zero, Quaternion.Euler(0, 0, item.localAngle), Vector3.one);
+            }
+            return matrix;
         }
 
         #endregion
