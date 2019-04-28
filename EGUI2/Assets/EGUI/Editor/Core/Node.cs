@@ -3,223 +3,385 @@ using System;
 using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
+using System.Configuration;
+using System.Text;
 
 namespace EGUI
 {
     [Persistence]
     public class Node : Object, IEnumerable<Node>
     {
-        [PersistentField]
-        private string mName = "";
+        [PersistentField] private string mName = "";
 
-        public string name { get { return mName; } set { mName = value; } }
+        public string name
+        {
+            get { return mName; }
+            set { mName = value; }
+        }
 
-        [PersistentField]
-        private Vector2 mLocalPosition = Vector2.zero;
+        [PersistentField] private Vector2 mLocalPosition = Vector2.zero;
 
         /// <summary>
-        /// Local position.
+        /// local position.
         /// </summary>
-        public Vector2 localPosition { get { return mLocalPosition; } set { if (mLocalPosition != value) { mLocalPosition = value; SetLayoutDirty(); } } }
+        public Vector2 localPosition
+        {
+            get { return mLocalPosition; }
+            set
+            {
+                if (mLocalPosition != value)
+                {
+                    mLocalPosition = value;
+                    SetLayoutDirty();
+                }
+            }
+        }
 
         /// <summary>
         /// World position.
         /// </summary>
-        public Vector2 worldPosition { get { Vector3 worldPos = localPosition; if (parent != null) worldPos = parent.local2WorldMatrix.MultiplyPoint(worldPos); return worldPos; } }
+        public Vector2 worldPosition
+        {
+            get
+            {
+                Vector3 worldPos = localPosition;
+                if (parent != null)
+                    worldPos = parent.local2WorldMatrix.MultiplyPoint(worldPos);
+                return worldPos;
+            }
+            set
+            {
+                var localPos = value;
+                if (parent != null)
+                    localPos = parent.world2LocalMatrix.MultiplyPoint(localPos);
+                localPosition = localPos;
+            }
+        }
 
-        [PersistentField]
-        private float mLocalAngle = 0;
+        [PersistentField] private float mLocalAngle = 0;
 
         /// <summary>
-        /// Local z-Axis angle.
+        /// Local Z-Axis angle.
         /// </summary>
-        public float localAngle { get { return mLocalAngle; } set { if (mLocalAngle != value) { mLocalAngle = value; SetLayoutDirty(); } } }
+        public float localAngle
+        {
+            get { return mLocalAngle; }
+            set
+            {
+                if (Mathf.Abs(mLocalAngle - value) > float.Epsilon)
+                {
+                    mLocalAngle = value;
+                    SetLayoutDirty();
+                }
+            }
+        }
 
-        [PersistentField]
-        private Vector2 mLocalScale = Vector2.one;
+        /// <summary>
+        /// World Z-Axis angle.
+        /// </summary>
+        public float worldAngle
+        {
+            get
+            {
+                var angle = localAngle;
+                var node = parent;
+                while (node != null)
+                {
+                    angle += node.localAngle;
+                    node = node.parent;
+                }
+
+                return FormatRotation(angle);
+            }
+            set
+            {
+                var node = parent;
+                while (node != null)
+                {
+                    value -= node.localAngle;
+                    node = node.parent;
+                }
+
+                localAngle = FormatRotation(value);
+            }
+        }
+
+        [PersistentField] private Vector2 mLocalScale = Vector2.one;
 
         /// <summary>
         /// Local scale.
         /// </summary>
-        public Vector2 localScale { get { return mLocalScale; } set { if (mLocalScale != value) { mLocalScale = value; SetLayoutDirty(); } } }
+        public Vector2 localScale
+        {
+            get { return mLocalScale; }
+            set
+            {
+                if (mLocalScale != value)
+                {
+                    mLocalScale = value;
+                    SetLayoutDirty();
+                }
+            }
+        }
 
-        [PersistentField]
-        private Vector2 mPivot;
+        /// <summary>
+        /// World scale.
+        /// </summary>
+        public Vector2 worldScale
+        {
+            get
+            {
+                var scale = localScale;
+                if (parent != null)
+                {
+                    var pScale = parent.worldScale;
+                    scale.x *= pScale.x;
+                    scale.y *= pScale.y;
+                }
+
+                return scale;
+            }
+            set
+            {
+                if (parent != null)
+                {
+                    var pScale = parent.worldScale;
+                    if (pScale.x > 0)
+                        value.x /= pScale.x;
+                    if (pScale.y > 0)
+                        value.y /= pScale.y;
+                }
+
+                localScale = value;
+            }
+        }
+
+        [PersistentField] private Vector2 mPivot;
 
         /// <summary>
         /// Pivot.
         /// </summary>
         public Vector2 pivot
         {
-            get
-            {
-                return mPivot;
-            }
+            get { return mPivot; }
             set
             {
                 if (mPivot != value)
                 {
-                    localPosition += new Vector2(
-                        localScale.x * size.x * (value.x - mPivot.x),
-                        localScale.y * size.y * (value.y - mPivot.y)
-                    );
                     mPivot = value;
                     SetLayoutDirty();
                 }
             }
         }
 
-        [PersistentField]
-        private Vector2 mSize;
+        [PersistentField] private Vector2 mSize;
 
         /// <summary>
-        /// Node's Size.
+        /// Size.
         /// </summary>
         public Vector2 size
         {
-            get
-            {
-                return mSize;
-            }
+            get { return mSize; }
             set
             {
                 if (mSize != value)
                 {
+                    var delta = value - mSize;
                     mSize = value;
-                    SyncSize2StretchSize(stretchWidth, stretchHeight);
+                    foreach (var child in this)
+                    {
+                        var min = child.anchorMin;
+                        var max = child.anchorMax;
+                        child.anchoredPosition += new Vector2(min.x * delta.x, min.y * delta.y);
+                        child.size += new Vector2((max.x - min.x) * delta.x, (max.y - min.y) * delta.y);
+                    }
+
                     SetLayoutDirty();
                 }
             }
         }
 
-        [PersistentField]
-        private Vector2 mStretchSize;
+        [PersistentField] private Vector2 mAnchorMin = Vector2.zero;
 
         /// <summary>
-        /// Stretched node size
+        /// Minimum anchor(top left).
         /// </summary>
-        public Vector2 stretchSize
+        public Vector2 anchorMin
         {
-            get
-            {
-                return mStretchSize;
-            }
+            get { return mAnchorMin; }
             set
             {
-                if (mStretchSize != value)
+                if (mAnchorMin != value)
                 {
-                    mStretchSize = value;
-                    SyncStretchSize2Size(stretchWidth, stretchHeight);
+                    mAnchorMin = value;
                     SetLayoutDirty();
                 }
             }
         }
 
-        [PersistentField]
-        private bool mStretchWidth;
+        [PersistentField] private Vector2 mAnchorMax = Vector2.zero;
 
         /// <summary>
-        /// is node width stretched ?
+        /// Maximum anchor(bottom right).
         /// </summary>
-        public bool stretchWidth
+        public Vector2 anchorMax
         {
-            get
-            {
-                return mStretchWidth;
-            }
+            get { return mAnchorMax; }
             set
             {
-                if (mStretchWidth != value)
+                if (mAnchorMax != value)
                 {
-                    mStretchWidth = value;
-                    if (mStretchWidth)
-                    {
-                        SyncSize2StretchSize(true, false);
-                    }
-                    else
-                    {
-                        SyncStretchSize2Size(true, false);
-                    }
+                    mAnchorMax = value;
                     SetLayoutDirty();
                 }
             }
         }
 
-        [PersistentField]
-        private bool mStretchHeight;
+        /// <summary>
+        /// The pivot's local position relative to the referenced anchor.
+        /// </summary>
+        public Vector2 anchoredPosition
+        {
+            get { return localPosition + GetPivotOffset() - GetMinAnchorOffset(); }
+            set { localPosition = value - GetPivotOffset() + GetMinAnchorOffset(); }
+        }
 
         /// <summary>
-        /// is node height stretched ?
+        /// The offset of the top left corner of the rectangle relative to the top left anchor.
         /// </summary>
-        public bool stretchHeight
+        public Vector2 offsetMin
         {
-            get
-            {
-                return mStretchHeight;
-            }
+            get { return localPosition - GetMinAnchorOffset(); }
             set
             {
-                if (mStretchHeight != value)
-                {
-                    mStretchHeight = value;
-                    if (mStretchHeight)
-                    {
-                        SyncSize2StretchSize(false, true);
-                    }
-                    else
-                    {
-                        SyncStretchSize2Size(false, true);
-                    }
-                    SetLayoutDirty();
-                }
+                var newPos = value + GetMinAnchorOffset();
+                size += (localPosition - newPos);
+                localPosition = newPos;
             }
         }
 
-        [PersistentField]
-        private Vector4 mPadding = Vector4.zero;
-
         /// <summary>
-        /// padding of node. (x: left, y: top, z: right, w: bottom)
+        /// The offset of the bottom right corner of the rectangle relative to the bottom right anchor.
         /// </summary>
-        public Vector4 padding { get { return mPadding; } set { if (mPadding != value) { mPadding = value; SetLayoutDirty(); } } }
+        public Vector2 offsetMax
+        {
+            get { return GetMaxAnchorOffset() - localPosition - size; }
+            set { size = GetMaxAnchorOffset() - localPosition - value; }
+        }
 
         private Rect mLocalRect;
 
         /// <summary>
         /// local rect.
         /// </summary>
-        public Rect localRect { get { TryRebuildLayout(); return mLocalRect; } }
+        public Rect localRect
+        {
+            get
+            {
+                TryRebuildLayout();
+                return mLocalRect;
+            }
+        }
 
-        /// <summary>
-        /// GUI layout matrix.
-        /// </summary>
         private Matrix4x4 mTRS = Matrix4x4.identity;
 
-        public Matrix4x4 TRS { get { TryRebuildLayout(); return mTRS; } }
+        /// <summary>
+        /// TRS matrix.
+        /// </summary>
+        public Matrix4x4 TRS
+        {
+            get
+            {
+                TryRebuildLayout();
+                return mTRS;
+            }
+        }
 
         private Matrix4x4 mLocal2WorldMatrix = Matrix4x4.identity;
 
         /// <summary>
         /// Local to world matrix.
         /// </summary>
-        public Matrix4x4 local2WorldMatrix { get { TryRebuildMatrix(); return mLocal2WorldMatrix; } }
+        public Matrix4x4 local2WorldMatrix
+        {
+            get
+            {
+                TryRebuildMatrix();
+                return mLocal2WorldMatrix;
+            }
+        }
 
         private Matrix4x4 mWorld2LocalMatrix = Matrix4x4.identity;
 
         /// <summary>
         /// World to local matrix.
         /// </summary>
-        public Matrix4x4 world2LocalMatrix { get { TryRebuildMatrix(); return mWorld2LocalMatrix; } }
+        public Matrix4x4 world2LocalMatrix
+        {
+            get
+            {
+                TryRebuildMatrix();
+                return mWorld2LocalMatrix;
+            }
+        }
 
-        [PersistentField]
-        private bool mEnabled = true;
+        /// <summary>
+        /// GUI TRS matrix
+        /// </summary>
+        private Matrix4x4 mGTRS = Matrix4x4.identity;
 
-        public bool enabled { get { return mEnabled; } set { if (mEnabled != value) { mEnabled = value; RebuildActivation(); } } }
+        public Matrix4x4 GTRS
+        {
+            get
+            {
+                TryRebuildLayout();
+                return mGTRS;
+            }
+        }
 
-        [PersistentField]
-        private bool mActive = true;
+        private Matrix4x4 mGUIMatrix = Matrix4x4.identity;
 
-        public bool active { get { return mActive; } protected set { if (mActive = value) { mActive = value; OnActivationUpdate(); } } }
+        /// <summary>
+        /// GUI matrix
+        /// </summary>
+        public Matrix4x4 GUIMatrix
+        {
+            get
+            {
+                TryRebuildMatrix();
+                return mGUIMatrix;
+            }
+        }
+
+        [PersistentField] private bool mEnabled = true;
+
+        public bool enabled
+        {
+            get { return mEnabled; }
+            set
+            {
+                if (mEnabled != value)
+                {
+                    mEnabled = value;
+                    RebuildActivation();
+                }
+            }
+        }
+
+        [PersistentField] private bool mActive = true;
+
+        public bool active
+        {
+            get { return mActive; }
+            protected set
+            {
+                if (mActive != value)
+                {
+                    mActive = value;
+                    OnActivationUpdate();
+                }
+            }
+        }
 
         private bool mLayoutDirty = true;
 
@@ -233,7 +395,8 @@ namespace EGUI
         {
             mLeavesUpdate.Clear();
             mLeavesUpdate.AddRange(mLeaves);
-            for (int i = 0; i < mLeavesUpdate.Count; i++)
+            var i = 0;
+            for (; i < mLeavesUpdate.Count; i++)
             {
                 var leaf = mLeavesUpdate[i];
                 if (leaf != null && leaf.active)
@@ -241,15 +404,27 @@ namespace EGUI
                     leaf.Update();
                 }
             }
+
             mChildrenUpdate.Clear();
             mChildrenUpdate.AddRange(mChildren);
-            for (int i = 0; i < mChildrenUpdate.Count; i++)
+            for (i = 0; i < mChildrenUpdate.Count; i++)
             {
                 var child = mChildrenUpdate[i];
                 if (child != null && child.active)
                 {
                     child.Update();
                 }
+            }
+        }
+
+        internal override void MarkInternalDisposed(bool value)
+        {
+            if (mInternalDisposed != value)
+            {
+                mInternalDisposed = value;
+                mChildren.ForEach(i => i.MarkInternalDisposed(value));
+                mLeaves.ForEach(i => i.MarkInternalDisposed(value));
+                RebuildActivation();
             }
         }
 
@@ -272,9 +447,8 @@ namespace EGUI
         public virtual void RebuildLayout()
         {
             mTRS = BuildTRSMatrix(this);
-            mLocalRect = new Rect(0, 0,
-                size.x - padding.x - padding.z,
-                size.y - padding.y - padding.w);
+            mGTRS = BuildGTRSMatrix(this);
+            mLocalRect = new Rect(0, 0, size.x, size.y);
         }
 
         protected void TryRebuildLayout()
@@ -296,6 +470,7 @@ namespace EGUI
         {
             mLocal2WorldMatrix = BuildLocal2WorldMatrix(this);
             mWorld2LocalMatrix = mLocal2WorldMatrix.inverse;
+            mGUIMatrix = BuildGUIMatrix(this);
         }
 
         protected void TryRebuildMatrix()
@@ -309,6 +484,12 @@ namespace EGUI
 
         public void RebuildActivation()
         {
+            if (IsNull())
+            {
+                active = false;
+                return;
+            }
+
             var i = parent;
             while (i != null && i.active) i = i.parent;
             active = i == null && enabled;
@@ -316,70 +497,20 @@ namespace EGUI
 
         protected void OnActivationUpdate()
         {
-            mLeaves.ForEach(i =>
-            {
-                i.RebuildActivation();
-            });
-            mChildren.ForEach(i =>
-            {
-                i.RebuildActivation();
-            });
-        }
-
-        protected void SyncSize2StretchSize(bool syncWidth, bool syncHeight)
-        {
-            if (parent != null)
-            {
-                if (syncWidth)
-                {
-                    mStretchSize.x = mSize.x / parent.size.x;
-                }
-                if (syncHeight)
-                {
-                    mStretchSize.y = mSize.y / parent.size.y;
-                }
-                mChildren.ForEach(i =>
-                {
-                    i.SyncStretchSize2Size(i.stretchWidth, i.stretchHeight);
-                    i.SetLayoutDirty();
-                });
-            }
-        }
-
-        protected void SyncStretchSize2Size(bool syncWidth, bool syncHeight)
-        {
-            if (parent != null)
-            {
-                if (syncWidth)
-                {
-                    mSize.x = mStretchSize.x * parent.size.x;
-                }
-                if (syncHeight)
-                {
-                    mSize.y = mStretchSize.y * parent.size.y;
-                }
-                mChildren.ForEach(i =>
-                {
-                    i.SyncStretchSize2Size(i.stretchWidth, i.stretchHeight);
-                    i.SetLayoutDirty();
-                });
-            }
+            mLeaves.ForEach(i => { i.RebuildActivation(); });
+            mChildren.ForEach(i => { i.RebuildActivation(); });
         }
 
         #region Transform
 
-        [PersistentField]
-        private Node mParent;
+        [PersistentField] private Node mParent;
 
         /// <summary>
-        /// Node's parnet.
+        /// Node's parent.
         /// </summary>
         public Node parent
         {
-            get
-            {
-                return mParent;
-            }
+            get { return mParent; }
             set
             {
                 if (mParent != value)
@@ -388,16 +519,19 @@ namespace EGUI
                     {
                         throw new InvalidOperationException();
                     }
+
                     if (mParent != null)
                     {
                         mParent.RemoveChild(this);
                     }
+
                     mParent = value;
                     if (mParent != null)
                     {
                         mParent.AddChild(this);
                     }
-                    if (!disposed)
+
+                    if (!IsNull())
                     {
                         SetMatrixDirty();
                         RebuildActivation();
@@ -407,8 +541,28 @@ namespace EGUI
             }
         }
 
-        [PersistentField]
-        private List<Node> mChildren = new List<Node>();
+        public void SetParent(Node parent, bool worldPositionStays = true)
+        {
+            if (this.parent != parent)
+            {
+                if (worldPositionStays)
+                {
+                    var pos = worldPosition;
+                    var angle = worldAngle;
+                    var scale = worldScale;
+                    this.parent = parent;
+                    worldAngle = angle;
+                    worldScale = scale;
+                    worldPosition = pos;
+                }
+                else
+                {
+                    this.parent = parent;
+                }
+            }
+        }
+
+        [PersistentField] private List<Node> mChildren = new List<Node>();
 
         public IEnumerator<Node> GetEnumerator()
         {
@@ -425,20 +579,16 @@ namespace EGUI
         /// </summary>
         public int childCount
         {
-            get
-            {
-                return mChildren.Count;
-            }
+            get { return mChildren.Count; }
         }
 
         public Node Find(string path)
         {
             Debug.Assert(path != null);
-            var names = path.Split(new char[] { '\\', '/' });
+            var names = path.Split('\\', '/');
             var node = this;
-            int index = 0;
-            while (node != null && 
-                index < names.Length)
+            var index = 0;
+            while (index < names.Length)
             {
                 foreach (var child in node)
                 {
@@ -448,9 +598,27 @@ namespace EGUI
                         break;
                     }
                 }
+
                 index += 1;
             }
+
             return node;
+        }
+
+        public string GetPath()
+        {
+            var sb = new StringBuilder();
+            var node = this;
+            while (node.parent != null)
+            {
+                sb.Insert(0, node.name);
+                sb.Insert(0, "/");
+                node = node.parent;
+            }
+
+            if (sb.Length > 0)
+                sb.Remove(0, 1);
+            return sb.ToString();
         }
 
         public Node GetChild(int index)
@@ -517,6 +685,7 @@ namespace EGUI
                     }
                 }
             }
+
             return index;
         }
 
@@ -526,17 +695,19 @@ namespace EGUI
             {
                 index = index < 0 ? parent.childCount - 1 : index;
                 index = Mathf.Clamp(index, 0, parent.childCount - 1);
-                int current = GetSiblingIndex();
+                var current = GetSiblingIndex();
                 if (current != index)
                 {
-                    for (int i = current; i < index; i++)
+                    for (var i = current; i < index; i++)
                     {
                         parent.mChildren[i] = parent.mChildren[i + 1];
                     }
-                    for (int i = current; i > index; i--)
+
+                    for (var i = current; i > index; i--)
                     {
                         parent.mChildren[i] = parent.mChildren[i - 1];
                     }
+
                     parent.mChildren[index] = this;
                     OnSiblingIndexChanged();
                 }
@@ -556,36 +727,78 @@ namespace EGUI
         public bool IsAncestorOf(Node node)
         {
             node = node.parent;
-            while (node != null && node != this) { node = node.parent; }
+            while (node != null && node != this)
+            {
+                node = node.parent;
+            }
+
             return node != null;
         }
 
-        protected void OnParentChanged()
+        public Vector2 TransformPoint(Vector2 position)
+        {
+            return local2WorldMatrix.MultiplyPoint(position);
+        }
+
+        public Vector2 InverseTransformPoint(Vector2 position)
+        {
+            return world2LocalMatrix.MultiplyPoint(position);
+        }
+
+        public bool ContainsLocalPosition(Vector2 localPosition)
+        {
+            return localRect.Contains(localPosition);
+        }
+
+        public bool ContainsWorldPosition(Vector2 worldPosition)
+        {
+            return localRect.Contains(InverseTransformPoint(worldPosition));
+        }
+
+        private void OnParentChanged()
         {
             mLeaves.ForEach(i => i.OnNodeParentChanged());
         }
 
-        protected void OnSiblingIndexChanged()
+        private void OnSiblingIndexChanged()
         {
             mLeaves.ForEach(i => i.OnNodeSiblingIndexChanged());
+        }
+
+        private Vector2 GetPivotOffset()
+        {
+            return new Vector2(pivot.x * size.x, pivot.y * size.y);
+        }
+
+        private Vector2 GetMinAnchorOffset()
+        {
+            return parent != null
+                ? new Vector2(anchorMin.x * parent.size.x, anchorMin.y * parent.size.y)
+                : Vector2.zero;
+        }
+
+        private Vector2 GetMaxAnchorOffset()
+        {
+            return parent != null
+                ? new Vector2(anchorMax.x * parent.size.x, anchorMax.y * parent.size.y)
+                : Vector2.zero;
         }
 
         #endregion
 
         #region Component
 
-        [PersistentField]
-        private List<Leaf> mLeaves = new List<Leaf>();
+        [PersistentField] private List<Leaf> mLeaves = new List<Leaf>();
 
         public T AddLeaf<T>() where T : Leaf
         {
-            return (T)AddLeaf(typeof(T));
+            return (T) AddLeaf(typeof(T));
         }
 
         public Leaf AddLeaf(Type type)
         {
             Debug.Assert(GetLeaf(type) == null);
-            var leaf = (Leaf)Activator.CreateInstance(type);
+            var leaf = (Leaf) Activator.CreateInstance(type);
             mLeaves.Add(leaf);
             leaf.node = this;
             return leaf;
@@ -600,13 +813,14 @@ namespace EGUI
                 leaf.node.RemoveLeaf(leaf);
                 leaf.node = null;
             }
+
             mLeaves.Add(leaf);
             leaf.node = this;
         }
 
         public T GetLeaf<T>(bool includeInactive = true)
         {
-            return (T)(object)GetLeaf(typeof(T), includeInactive);
+            return (T) (object) GetLeaf(typeof(T), includeInactive);
         }
 
         public Leaf GetLeaf(Type type, bool includeInactive = true)
@@ -616,12 +830,13 @@ namespace EGUI
 
         public T[] GetLeaves<T>(bool includeInactive = true)
         {
-            return GetLeaves(typeof(T)).Select(leaf => (T)(object)leaf).ToArray();
+            return GetLeaves(typeof(T)).Select(leaf => (T) (object) leaf).ToArray();
         }
 
         public Leaf[] GetLeaves(Type type, bool includeInactive = true)
         {
-            return mLeaves.Where(leaf => type.IsAssignableFrom(leaf.GetType()) && (includeInactive || leaf.active)).ToArray();
+            return mLeaves.Where(leaf => type.IsAssignableFrom(leaf.GetType()) && (includeInactive || leaf.active))
+                .ToArray();
         }
 
         public Leaf[] GetAllLeaves(bool includeInactive = true)
@@ -631,7 +846,7 @@ namespace EGUI
 
         public T GetLeafInAncestors<T>(bool includeInactive = true)
         {
-            return (T)(object)GetLeafInAncestors(typeof(T), includeInactive);
+            return (T) (object) GetLeafInAncestors(typeof(T), includeInactive);
         }
 
         public Leaf GetLeafInAncestors(Type type, bool includeInactive = true)
@@ -643,12 +858,13 @@ namespace EGUI
                 leaf = node.GetLeaf(type, includeInactive);
                 node = node.parent;
             }
+
             return leaf;
         }
 
         public T[] GetLeavesInAncestors<T>(bool includeInactive)
         {
-            return Array.ConvertAll(GetLeavesInAncestors(typeof(T), includeInactive), i => (T)(object)i);
+            return Array.ConvertAll(GetLeavesInAncestors(typeof(T), includeInactive), i => (T) (object) i);
         }
 
         public Leaf[] GetLeavesInAncestors(Type type, bool includeInactive = true)
@@ -662,14 +878,16 @@ namespace EGUI
                 {
                     leaves.Add(leaf);
                 }
+
                 node = node.parent;
             }
+
             return leaves.ToArray();
         }
 
         public T GetLeafInChildren<T>(bool includeInactive)
         {
-            return (T)(object)GetLeafInChildren(typeof(T), includeInactive);
+            return (T) (object) GetLeafInChildren(typeof(T), includeInactive);
         }
 
         public Leaf GetLeafInChildren(Type type, bool includeInactive)
@@ -682,17 +900,19 @@ namespace EGUI
                 {
                     leaf = child.GetLeafInChildren(type, includeInactive);
                 }
+
                 if (leaf != null)
                 {
                     break;
                 }
             }
+
             return leaf;
         }
 
         public T[] GetLeavesInChildren<T>(bool includeInactive)
         {
-            return Array.ConvertAll(GetLeavesInChildren(typeof(T), includeInactive), i => (T)(object)i);
+            return Array.ConvertAll(GetLeavesInChildren(typeof(T), includeInactive), i => (T) (object) i);
         }
 
         public Leaf[] GetLeavesInChildren(Type type, bool includeInactive)
@@ -705,8 +925,10 @@ namespace EGUI
                 {
                     leaves.Add(leaf);
                 }
+
                 leaves.AddRange(child.GetLeavesInChildren(type, includeInactive));
             }
+
             return leaves.ToArray();
         }
 
@@ -748,20 +970,46 @@ namespace EGUI
 
         #region Utility
 
-        public static Matrix4x4 BuildTRSMatrix(Node node)
+        public static Matrix4x4 BuildGTRSMatrix(Node node)
         {
             var matrix = GUI.matrix;
-            var offset = new Vector2(node.pivot.x * node.size.x - node.padding.x, node.pivot.y * node.size.y - node.padding.y);
-            var newMatrix = Matrix4x4.Translate(node.localPosition - offset);
+            var offset = node.GetPivotOffset();
+            var newMatrix = Matrix4x4.Translate(node.localPosition);
             GUI.matrix = newMatrix;
             var scale = node.localScale;
             if (scale.x == 0) scale.x = float.MinValue;
-            if (scale.y == 0) scale.y = float.MinValue;
+            if (scale.y == 0) scale.x = float.MinValue;
             GUIUtility.ScaleAroundPivot(scale, offset);
-            GUIUtility.RotateAroundPivot(node.localAngle, node.localPosition);
+            GUIUtility.RotateAroundPivot(node.localAngle, node.localPosition + offset);
             var ret = GUI.matrix;
             GUI.matrix = matrix;
             return ret;
+        }
+
+        public static Matrix4x4 BuildGUIMatrix(Node node)
+        {
+            var stack = new Stack<Node>();
+            var current = node;
+            while (current != null)
+            {
+                stack.Push(current);
+                current = current.parent;
+            }
+
+            var matrix = Matrix4x4.identity;
+            while (stack.Count > 0)
+            {
+                var pop = stack.Pop();
+                matrix = matrix * pop.GTRS;
+            }
+
+            return matrix;
+        }
+
+        public static Matrix4x4 BuildTRSMatrix(Node node)
+        {
+            return Matrix4x4.TRS(node.localPosition, Quaternion.Euler(0, 0, node.localAngle),
+                new Vector3(node.localScale.x, node.localScale.y, 1));
         }
 
         public static Matrix4x4 BuildLocal2WorldMatrix(Node node)
@@ -773,12 +1021,14 @@ namespace EGUI
                 stack.Push(current);
                 current = current.parent;
             }
+
             var matrix = Matrix4x4.identity;
             while (stack.Count > 0)
             {
                 var pop = stack.Pop();
                 matrix = matrix * pop.TRS;
             }
+
             return matrix;
         }
 
@@ -787,7 +1037,7 @@ namespace EGUI
             return BuildLocal2WorldMatrix(node).inverse;
         }
 
-        public static Matrix4x4 BuildLocal2WorldRotateMatrix(Node node)
+        public static Matrix4x4 BuildGUIRotationMatrix(Node node)
         {
             var stack = new Stack<Node>();
             var current = node;
@@ -796,13 +1046,27 @@ namespace EGUI
                 stack.Push(current);
                 current = current.parent;
             }
+
             var matrix = Matrix4x4.identity;
             while (stack.Count > 0)
             {
                 var item = stack.Pop();
-                matrix = matrix * Matrix4x4.TRS(Vector3.zero, Quaternion.Euler(0, 0, item.localAngle), Vector3.one);
+                var rawMatrix = GUI.matrix;
+                GUI.matrix = Matrix4x4.identity;
+                GUIUtility.RotateAroundPivot(item.localAngle, item.localPosition);
+                matrix = matrix * GUI.matrix;
+                GUI.matrix = rawMatrix;
             }
+
             return matrix;
+        }
+
+        public static float FormatRotation(float angle)
+        {
+            angle = angle % 360;
+            if (angle < 0)
+                angle += 360;
+            return angle;
         }
 
         #endregion

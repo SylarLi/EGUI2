@@ -7,14 +7,22 @@ namespace EGUI.Editor
     {
         private UserFrame[] mFrames;
 
-        public UserFrame[] frames { get { return mFrames; } set { mFrames = value; } }
-
-        public override void OnDraw()
+        public UserFrame[] frames
         {
-            OnFocusControl();
-            base.OnDraw();
+            get { return mFrames; }
+            set { mFrames = value; }
         }
 
+        protected override void OnGUI()
+        {
+            OnFocusControl();
+            if (frames != null && frames.Length > 0)
+            {
+                foreach (var f in frames)
+                    f.OnDraw();
+            }
+        }
+        
         protected void OnFocusControl()
         {
             if (focused && frames != null && frames.Length > 0)
@@ -25,15 +33,6 @@ namespace EGUI.Editor
                     foreach (var f in frames)
                         f.focused = contains.Contains(f);
                 }
-            }
-        }
-
-        protected override void OnGUI()
-        {
-            if (frames != null && frames.Length > 0)
-            {
-                foreach (var f in frames)
-                    f.OnDraw();
             }
         }
 
@@ -48,10 +47,7 @@ namespace EGUI.Editor
 
         protected override Color backgroundColor
         {
-            get
-            {
-                return UserSetting.FrameContainerBackgroundColor;
-            }
+            get { return UserSetting.FrameContainerBackgroundColor; }
         }
     }
 }

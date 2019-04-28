@@ -25,13 +25,13 @@
 
         public override void Execute()
         {
-            mNode.parent = mNewParent;
+            mNode.SetParent(mNewParent);
             mNode.SetSiblingIndex(mNewIndex);
         }
 
         public override void Undo()
         {
-            mNode.parent = mRawParent;
+            mNode.SetParent(mRawParent);
             mNode.SetSiblingIndex(mRawIndex);
         }
     }

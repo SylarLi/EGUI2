@@ -18,6 +18,7 @@ namespace EGUI
             {
                 list.Add(node);
             }
+
             return list.ToArray();
         }
     }

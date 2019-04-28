@@ -4,6 +4,7 @@ using System.Linq;
 using UnityEngine;
 using UnityEditor;
 using EGUI.UI;
+using UnityEngine.SocialPlatforms;
 
 namespace EGUI.Editor
 {
@@ -12,57 +13,55 @@ namespace EGUI.Editor
         public static void ShowNodeContext(Node root)
         {
             var menu = new GenericMenu();
-            var nodes = UserSelection.nodes;
+            var nodes = UserDatabase.selection.nodes;
             if (nodes != null && nodes.Length > 0)
             {
-                menu.AddItem(new GUIContent(Language.L_Copy), false, () =>
+                menu.AddItem(new GUIContent(Locale.L_Copy), false, () =>
                 {
                     UserUtil.CopyNodes(root);
                 });
             }
             else
             {
-                menu.AddDisabledItem(new GUIContent(Language.L_Copy));
+                menu.AddDisabledItem(new GUIContent(Locale.L_Copy));
             }
             if (UserClipBoard.data != null && 
                 UserClipBoard.data is Node[] && 
-                (UserClipBoard.data as Node[]).Length > 0)
+                ((Node[]) UserClipBoard.data).Length > 0)
             {
-                menu.AddItem(new GUIContent(Language.L_Paste), false, () =>
+                menu.AddItem(new GUIContent(Locale.L_Paste), false, () =>
                 {
                     UserUtil.PasteNodes(root);
                 });
             }
             else
             {
-                menu.AddDisabledItem(new GUIContent(Language.L_Paste));
+                menu.AddDisabledItem(new GUIContent(Locale.L_Paste));
             }
             menu.AddSeparator("");
             if (nodes != null && nodes.Length > 0)
             {
-                menu.AddItem(new GUIContent(Language.L_Duplicate), false, () =>
+                menu.AddItem(new GUIContent(Locale.L_Duplicate), false, () =>
                 {
                     UserUtil.DuplicateNodes(root);
                 });
-                menu.AddItem(new GUIContent(Language.L_Delete), false, () =>
-                {
-                    UserUtil.DeleteNodes(root);
-                });
+                menu.AddItem(new GUIContent(Locale.L_Delete), false, UserUtil.DeleteNodes);
             }
             else
             {
-                menu.AddDisabledItem(new GUIContent(Language.L_Duplicate));
-                menu.AddDisabledItem(new GUIContent(Language.L_Delete));
+                menu.AddDisabledItem(new GUIContent(Locale.L_Duplicate));
+                menu.AddDisabledItem(new GUIContent(Locale.L_Delete));
             }
             menu.AddSeparator("");
-            menu.AddItem(new GUIContent(Language.L_CreateEmpty), false, () =>
+            menu.AddItem(new GUIContent(Locale.L_CreateEmpty), false, () =>
             {
                 UserUtil.CreateControl(typeof(Node), root);
             });
-            var uiTypes = new Type[] { typeof(Text), typeof(Image), typeof(Button), typeof(Toggle), typeof(TextField) };
-            foreach (var uiType in uiTypes)
+            var uiTypes = new Type[] { typeof(Text), typeof(Image), typeof(Button), typeof(Toggle), typeof(TextField), typeof(Scrollbar) };
+            foreach (var type in uiTypes)
             {
-                menu.AddItem(new GUIContent(Language.L_UI + "/" + uiType.Name), false, () =>
+                var uiType = type;
+                menu.AddItem(new GUIContent(Locale.L_UI + "/" + uiType.Name), false, () =>
                 {
                     UserUtil.CreateControl(uiType, root);
                 });

@@ -23,6 +23,15 @@ namespace EGUI
 
         public bool active { get { return mActive; } protected set { if (mActive != value) { mActive = value; if (mActive && !mIsStart) { mIsStart = true; OnStart(); } if (mActive) OnEnable(); else OnDisable(); } } }
 
+        internal override void MarkInternalDisposed(bool value)
+        {
+            if (mInternalDisposed != value)
+            {
+                mInternalDisposed = value;
+                RebuildActivation();
+            }
+        }
+        
         public override void Dispose()
         {
             if (active)
@@ -64,7 +73,7 @@ namespace EGUI
 
         public T[] GetLeaves<T>(bool includeInactive = true)
         {
-            return GetLeaves<T>(includeInactive);
+            return node.GetLeaves<T>(includeInactive);
         }
 
         public Leaf[] GetLeaves(Type type, bool includeInactive = true)

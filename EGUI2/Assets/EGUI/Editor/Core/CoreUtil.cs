@@ -13,7 +13,8 @@ namespace EGUI
         {
             return AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(assembly => assembly.GetTypes())
-                .Where(t => baseType.IsAssignableFrom(t) && (includeAbstract || !t.IsAbstract) && (includeInterface || !t.IsInterface))
+                .Where(t => baseType.IsAssignableFrom(t) && (includeAbstract || !t.IsAbstract) &&
+                            (includeInterface || !t.IsInterface))
                 .ToArray();
         }
 
@@ -21,8 +22,10 @@ namespace EGUI
         {
             if (type.IsSubclassOf(typeof(MulticastDelegate)))
                 return false;
-            else if (type == typeof(IntPtr) ||
+            if (type == typeof(IntPtr) ||
                 type == typeof(UIntPtr))
+                return false;
+            if (type.IsPointer)
                 return false;
             return true;
         }
@@ -37,6 +40,7 @@ namespace EGUI
             {
                 throw new NotSupportedException();
             }
+
             return Activator.CreateInstance(type, args);
         }
 
@@ -57,6 +61,7 @@ namespace EGUI
                     }
                 }
             }
+
             return type;
         }
 
@@ -67,7 +72,7 @@ namespace EGUI
             foreach (var typeField in typeFields)
                 fields.Add(typeField);
             if (inherit && type.BaseType != null)
-                GetFields(fields, type.BaseType, flag, inherit);
+                GetFields(fields, type.BaseType, flag, true);
         }
 
         public static FieldInfo GetField(Type type, string name, BindingFlags flag, bool inherit)
@@ -75,18 +80,19 @@ namespace EGUI
             flag |= BindingFlags.DeclaredOnly;
             var field = type.GetField(name, flag);
             if (field == null && inherit && type.BaseType != null)
-                field = GetField(type.BaseType, name, flag, inherit);
+                field = GetField(type.BaseType, name, flag, true);
             return field;
         }
 
-        public static void GetProperties(ICollection<PropertyInfo> properties, Type type, BindingFlags flag, bool inherit)
+        public static void GetProperties(ICollection<PropertyInfo> properties, Type type, BindingFlags flag,
+            bool inherit)
         {
             flag |= BindingFlags.DeclaredOnly;
             var typeProperties = type.GetProperties(flag);
             foreach (var typeProperty in typeProperties)
                 properties.Add(typeProperty);
             if (inherit && type.BaseType != null)
-                GetProperties(properties, type.BaseType, flag, inherit);
+                GetProperties(properties, type.BaseType, flag, true);
         }
 
         public static PropertyInfo GetProperty(Type type, string name, BindingFlags flag, bool inherit)
@@ -94,11 +100,12 @@ namespace EGUI
             flag |= BindingFlags.DeclaredOnly;
             var property = type.GetProperty(name, flag);
             if (property == null && inherit && type.BaseType != null)
-                property = GetProperty(type.BaseType, name, flag, inherit);
+                property = GetProperty(type.BaseType, name, flag, true);
             return property;
         }
 
-        public static MemberInfo GetMember(Type type, string name, MemberTypes memberTypes, BindingFlags flag, bool inherit)
+        public static MemberInfo GetMember(Type type, string name, MemberTypes memberTypes, BindingFlags flag,
+            bool inherit)
         {
             flag |= BindingFlags.DeclaredOnly;
             MemberInfo member = null;
@@ -106,16 +113,16 @@ namespace EGUI
             if (members.Length > 0)
                 member = members[0];
             else if (inherit && type.BaseType != null)
-                member = GetMember(type.BaseType, name, memberTypes, flag, inherit);
+                member = GetMember(type.BaseType, name, memberTypes, flag, true);
             return member;
         }
 
         public static Type GetMemberType(MemberInfo memberInfo)
         {
             if (memberInfo.MemberType == MemberTypes.Field)
-                return ((FieldInfo)memberInfo).FieldType;
+                return ((FieldInfo) memberInfo).FieldType;
             else if (memberInfo.MemberType == MemberTypes.Property)
-                return ((PropertyInfo)memberInfo).PropertyType;
+                return ((PropertyInfo) memberInfo).PropertyType;
             else
                 throw new NotSupportedException();
         }
@@ -123,9 +130,9 @@ namespace EGUI
         public static object GetMemberValue(MemberInfo memberInfo, object obj)
         {
             if (memberInfo.MemberType == MemberTypes.Field)
-                return ((FieldInfo)memberInfo).GetValue(obj);
+                return ((FieldInfo) memberInfo).GetValue(obj);
             else if (memberInfo.MemberType == MemberTypes.Property)
-                return ((PropertyInfo)memberInfo).GetValue(obj, null);
+                return ((PropertyInfo) memberInfo).GetValue(obj, null);
             else
                 throw new NotSupportedException();
         }
@@ -133,9 +140,9 @@ namespace EGUI
         public static void SetMemberValue(MemberInfo memberInfo, object obj, object value)
         {
             if (memberInfo.MemberType == MemberTypes.Field)
-                ((FieldInfo)memberInfo).SetValue(obj, value);
+                ((FieldInfo) memberInfo).SetValue(obj, value);
             else if (memberInfo.MemberType == MemberTypes.Property)
-                ((PropertyInfo)memberInfo).SetValue(obj, value, null);
+                ((PropertyInfo) memberInfo).SetValue(obj, value, null);
             else
                 throw new NotSupportedException();
         }
@@ -144,23 +151,25 @@ namespace EGUI
         {
             Debug.Assert(type != null, "Type can not be null.");
             Debug.Assert(!string.IsNullOrEmpty(memberPath), "MemberPath can not be empty.");
-            var names = memberPath.Split(new char[] { '.' });
+            var names = memberPath.Split(new char[] {'.'});
             var path = new MemberInfo[names.Length];
             int index = 0;
             while (type != null &&
-                index < names.Length)
+                   index < names.Length)
             {
                 var memberInfo = GetMember(
                     type,
                     names[index],
                     MemberTypes.Field | MemberTypes.Property,
-                    BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.GetField | BindingFlags.SetField | BindingFlags.GetProperty | BindingFlags.SetProperty,
+                    BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic |
+                    BindingFlags.GetField | BindingFlags.SetField | BindingFlags.GetProperty | BindingFlags.SetProperty,
                     true);
                 Debug.Assert(memberInfo != null, "Can not find member " + names[index] + " for type: " + type.FullName);
                 path[index] = memberInfo;
                 type = GetMemberType(memberInfo);
                 index += 1;
             }
+
             return path;
         }
 
@@ -168,22 +177,25 @@ namespace EGUI
         {
             foreach (var memberInfo in memberPath)
             {
-                if (memberInfo.MemberType == MemberTypes.Field && !(memberInfo as FieldInfo).IsStatic && obj == null) break;
-                if (memberInfo.MemberType == MemberTypes.Property && !(memberInfo as PropertyInfo).GetAccessors(true)[0].IsStatic && obj == null) break;
+                if (memberInfo.MemberType == MemberTypes.Field && !((FieldInfo) memberInfo).IsStatic &&
+                    obj == null) break;
+                if (memberInfo.MemberType == MemberTypes.Property &&
+                    !((PropertyInfo) memberInfo).GetAccessors(true)[0].IsStatic && obj == null) break;
                 obj = GetMemberValue(memberInfo, obj);
             }
+
             return obj;
         }
 
         public static void SetMemberValue(MemberInfo[] memberPath, object obj, object value)
         {
-            var list = new List<object>() { obj };
+            var list = new List<object>() {obj};
             for (int i = 0; i < memberPath.Length - 1; i++)
             {
-                var item = list[list.Count - 1] != null ? 
-                    GetMemberValue(memberPath[i], list[list.Count - 1]) : null;
+                var item = list[list.Count - 1] != null ? GetMemberValue(memberPath[i], list[list.Count - 1]) : null;
                 list.Add(item);
             }
+
             SetMemberValue(memberPath[memberPath.Length - 1], list[list.Count - 1], value);
             for (int i = list.Count - 1; i >= 1; i--)
             {
@@ -202,7 +214,7 @@ namespace EGUI
             {
                 if (i.GetType() == leafType) return false;
                 var attrs = i.GetType().GetCustomAttributes(typeof(RequireLeafAttribute), true);
-                return attrs.Any(attr => (attr as RequireLeafAttribute).type == leafType);
+                return attrs.Any(attr => ((RequireLeafAttribute) attr).type == leafType);
             });
         }
 
@@ -210,12 +222,12 @@ namespace EGUI
         {
             var attrs = leafType.GetCustomAttributes(typeof(RequireLeafAttribute), true);
             return (from attr in attrs
-                    select (attr as RequireLeafAttribute).type).ToArray();
+                select ((RequireLeafAttribute) attr).type).ToArray();
         }
 
         public static bool CompareIList(IList list1, IList list2)
         {
-            if (list1 == list2)
+            if (Equals(list1, list2))
             {
                 return true;
             }
@@ -225,6 +237,7 @@ namespace EGUI
                 {
                     return false;
                 }
+
                 for (int i = 0; i < list1.Count; i++)
                 {
                     if (list1[i] != list2[i])
@@ -232,8 +245,10 @@ namespace EGUI
                         return false;
                     }
                 }
+
                 return true;
             }
+
             return false;
         }
 

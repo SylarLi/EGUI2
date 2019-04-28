@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using UnityEditor;
+using UnityEngine;
 
 namespace EGUI.Editor
 {
@@ -21,5 +22,37 @@ namespace EGUI.Editor
         public static Color SceneNodeSelectionColor = new Color(1, 0.4f, 0);
 
         public const float SceneNodeSelectionLineWidth = 2;
+
+        public const float DistanceComparisionTolerance = 0.01f;
+        
+        public static Color FrameFocusedLineColor = new Color(0f, 0.08f, 1f);
+
+        public static float FrameFocusedLineWidth = 1f;
+        
+        public const int NetGridLineWidth = 1;
+
+        public const int NetGridLineSpace = 20;
+
+        public static Color NetGridLineColor = new Color(0.5f, 0.5f, 0.5f, 0.7f);
+        
+        private static GUIStyle mFrameTipsLabelStyle;
+        public static GUIStyle FrameTipsLabelStyle
+        {
+            get
+            {
+                if (mFrameTipsLabelStyle == null)
+                {
+                    mFrameTipsLabelStyle = new GUIStyle(EditorStyles.boldLabel);
+                    mFrameTipsLabelStyle.fontSize = 30;
+                    mFrameTipsLabelStyle.alignment = TextAnchor.MiddleCenter;
+                    mFrameTipsLabelStyle.normal.textColor = Color.gray;
+                    mFrameTipsLabelStyle.wordWrap = true;
+                }
+
+                return mFrameTipsLabelStyle;
+            }
+        }
+
+        public readonly static int AnchorHash = "AnchorHash".GetHashCode();
     }
 }

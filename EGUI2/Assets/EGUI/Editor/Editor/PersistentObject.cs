@@ -10,16 +10,26 @@ namespace EGUI.Editor
     {
         private object[] mValues;
 
-        public object[] values { get { return mValues; } }
+        public object[] values
+        {
+            get { return mValues; }
+        }
 
         private Type mType;
 
-        public Type type { get { return mType; } }
+        public Type type
+        {
+            get { return mType; }
+        }
+
+        public PersistentObject()
+        {
+        }
 
         public PersistentObject(object value)
         {
             Debug.Assert(value != null, "Object can not be null.");
-            mValues = new object[] { value };
+            mValues = new object[] {value};
             mType = value.GetType();
         }
 
@@ -42,19 +52,21 @@ namespace EGUI.Editor
             var members = new List<MemberInfo>();
             UserUtil.GetDisplayedMembersInType(members, type);
             return (from m in members
-                    select new PersistentProperty(this, m.Name)).ToArray();
+                select new PersistentProperty(this, m.Name)).ToArray();
         }
 
         public T GetValue<T>()
         {
-            Debug.Assert(typeof(T).IsAssignableFrom(type), string.Format("Type missmatch, {0} : {1}.", typeof(T).Name, type.Name));
-            return (T)values[0];
+            Debug.Assert(typeof(T).IsAssignableFrom(type),
+                string.Format("Type missmatch, {0} : {1}.", typeof(T).Name, type.Name));
+            return (T) values[0];
         }
 
         public T[] GetValues<T>()
         {
-            Debug.Assert(typeof(T).IsAssignableFrom(type), string.Format("Type missmatch, {0} : {1}.", typeof(T).Name, type.Name));
-            return values.Select(i => (T)i).ToArray();
+            Debug.Assert(typeof(T).IsAssignableFrom(type),
+                string.Format("Type missmatch, {0} : {1}.", typeof(T).Name, type.Name));
+            return values.Select(i => (T) i).ToArray();
         }
     }
 }

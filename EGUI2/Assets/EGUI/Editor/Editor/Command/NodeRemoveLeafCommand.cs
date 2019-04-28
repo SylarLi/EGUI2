@@ -17,10 +17,12 @@
         public override void Execute()
         {
             mNode.RemoveLeaf(mLeaf);
+            mLeaf.MarkInternalDisposed(true);
         }
 
         public override void Undo()
         {
+            mLeaf.MarkInternalDisposed(false);
             mNode.AddLeaf(mLeaf);
         }
     }

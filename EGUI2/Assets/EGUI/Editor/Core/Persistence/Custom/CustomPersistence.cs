@@ -14,10 +14,7 @@ namespace EGUI
 
         public virtual Type persistentType
         {
-            get
-            {
-                throw new NotImplementedException();
-            }
+            get { throw new NotImplementedException(); }
         }
 
         public virtual void Parse(object value, BinaryWriter writer)
@@ -38,6 +35,16 @@ namespace EGUI
         protected void Deserialize(BinaryReader reader, Persistence.InverseLookup.LookupCallback callback)
         {
             persistence.Deserialize(reader, callback);
+        }
+
+        protected void SerializeStructure(object obj, Type type, BinaryWriter writer)
+        {
+            persistence.SerializeStructure(obj, type, writer);
+        }
+
+        protected void DeserializeStructure(Type type, BinaryReader reader)
+        {
+            persistence.DeserializeStructure(type, reader);
         }
 
         protected void SerializeConstruction(object obj, bool instance, Type type, BinaryWriter writer)
@@ -75,7 +82,8 @@ namespace EGUI
             persistence.SerializeReference(reference, type, writer);
         }
 
-        protected void DeserializeReference(Type type, BinaryReader reader, Persistence.InverseLookup.LookupCallback callback)
+        protected void DeserializeReference(Type type, BinaryReader reader,
+            Persistence.InverseLookup.LookupCallback callback)
         {
             persistence.DeserializeReference(type, reader, callback);
         }
@@ -98,6 +106,26 @@ namespace EGUI
         protected object DeserializeArray(Type type, BinaryReader reader)
         {
             return persistence.DeserializeArray(type, reader);
+        }
+
+        public void PushCheckpoint(BinaryWriter writer)
+        {
+            persistence.PushCheckpoint(writer);
+        }
+
+        public void PopCheckpoint(BinaryWriter writer)
+        {
+            persistence.PopCheckpoint(writer);
+        }
+
+        public void SaveCheckpoint(BinaryReader reader)
+        {
+            persistence.SaveCheckpoint(reader);
+        }
+
+        public void LoadCheckpoint(BinaryReader reader)
+        {
+            persistence.LoadCheckpoint(reader);
         }
     }
 }

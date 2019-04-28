@@ -6,23 +6,36 @@ namespace EGUI
 {
     public class PropertyInfoPersistence : CustomPersistence
     {
-        public PropertyInfoPersistence(Persistence persistence) : base(persistence) { }
+        public PropertyInfoPersistence(Persistence persistence) : base(persistence)
+        {
+        }
 
-        public override Type persistentType { get { return typeof(PropertyInfo); } }
+        public override Type persistentType
+        {
+            get { return typeof(PropertyInfo); }
+        }
 
         public override void Parse(object value, BinaryWriter writer)
         {
+            PushCheckpoint(writer);
             var propertyInfo = value as PropertyInfo;
             SerializeType(propertyInfo.ReflectedType, writer);
-            Serialize(propertyInfo.Name, typeof(string), writer);
+            writer.Write(propertyInfo.Name);
+            PopCheckpoint(writer);
         }
 
         public override object Revert(BinaryReader reader)
         {
+            SaveCheckpoint(reader);
             var type = DeserializeType(reader);
-            var name = "";
-            Deserialize(reader, ret => name = (string)ret);
-            return type.GetProperty(name, BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (type == null)
+            {
+                LoadCheckpoint(reader);
+                return null;
+            }
+            var name = reader.ReadString();
+            return type.GetProperty(name,
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         }
     }
 }

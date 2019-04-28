@@ -7,13 +7,21 @@ namespace EGUI
 {
     public class DictionaryPersistence : CustomPersistence
     {
-        public DictionaryPersistence(Persistence persistence) : base(persistence) { }
+        public DictionaryPersistence(Persistence persistence) : base(persistence)
+        {
+        }
 
-        public override Type persistentType { get { return typeof(Dictionary<,>); } }
+        public override Type persistentType
+        {
+            get { return typeof(Dictionary<,>); }
+        }
 
         public override void Parse(object value, BinaryWriter writer)
         {
-            var itemTypes = persistentType.GetGenericArguments();
+            PushCheckpoint(writer);
+            var type = value.GetType();
+            SerializeType(value.GetType(), writer);
+            var itemTypes = type.GetGenericArguments();
             var keyType = itemTypes[0];
             var valType = itemTypes[1];
             var dictionary = value as IDictionary;
@@ -23,17 +31,26 @@ namespace EGUI
                 var trueType = key != null ? key.GetType() : keyType;
                 Serialize(key, trueType, writer);
             }
+
             foreach (var val in dictionary.Values)
             {
                 var trueType = val != null ? val.GetType() : valType;
                 Serialize(val, trueType, writer);
             }
+            PopCheckpoint(writer);
         }
 
         public override object Revert(BinaryReader reader)
         {
+            SaveCheckpoint(reader);
+            var type = DeserializeType(reader);
+            if (type == null)
+            {
+                LoadCheckpoint(reader);
+                return null;
+            }
             var length = reader.ReadInt32();
-            var dictionary = Activator.CreateInstance(persistentType, new object[] { length }) as IDictionary;
+            var dictionary = Activator.CreateInstance(type, length) as IDictionary;
             var keys = new object[length];
             var vals = new object[length];
             var count = 0;
@@ -41,13 +58,13 @@ namespace EGUI
             {
                 if (++count == length * 2)
                 {
-                    for (int i = 0; i < keys.Length; i++)
+                    for (var i = 0; i < keys.Length; i++)
                     {
                         dictionary.Add(keys[i], vals[i]);
                     }
                 }
             };
-            for (int i = 0; i < keys.Length; i++)
+            for (var i = 0; i < keys.Length; i++)
             {
                 var index = i;
                 Deserialize(reader, ret =>
@@ -56,7 +73,8 @@ namespace EGUI
                     callback();
                 });
             }
-            for (int i = 0; i < vals.Length; i++)
+
+            for (var i = 0; i < vals.Length; i++)
             {
                 var index = i;
                 Deserialize(reader, ret =>
@@ -65,6 +83,7 @@ namespace EGUI
                     callback();
                 });
             }
+
             return dictionary;
         }
     }

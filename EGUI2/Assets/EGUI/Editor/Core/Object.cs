@@ -1,25 +1,44 @@
-﻿namespace EGUI
+﻿using UnityEngine;
+
+namespace EGUI
 {
     [Persistence]
     public abstract class Object
-    {
-        private bool mDisposed;
+    {      
+        [PersistentField]
+        protected bool mDisposed;
 
-        public bool disposed { get { return mDisposed; } }
+        [PersistentField]
+        protected bool mInternalDisposed;
 
-        public virtual void Update() { }
+        internal virtual void MarkInternalDisposed(bool value)
+        {
+            mInternalDisposed = value;
+        }
 
-        public virtual void Dispose() { OnDestroy(); mDisposed = true; }
+        public virtual void Update()
+        {
+        }
 
-        public virtual void OnDestroy() { }
+        public virtual void Dispose()
+        {
+            OnDestroy();
+            mDisposed = true;
+            Database.RemoveObject(this);
+        }
+
+        public virtual void OnDestroy()
+        {
+        }
+
+        public Object()
+        {
+            Database.AddObject(this);
+        }
 
         public static bool operator ==(Object obj1, Object obj2)
         {
-            if (ReferenceEquals(obj1, null))
-            {
-                return ReferenceEquals(obj2, null);
-            }
-            return obj1.Equals(obj2);
+            return ReferenceEquals(obj1, null) ? ReferenceEquals(obj2, null) : obj1.Equals(obj2);
         }
 
         public static bool operator !=(Object obj1, Object obj2)
@@ -29,11 +48,12 @@
 
         public override bool Equals(object obj)
         {
-            Object o = (Object)obj;
+            var o = (Object) obj;
             if (ReferenceEquals(o, null) || o.IsNull())
             {
                 return IsNull();
             }
+
             return ReferenceEquals(this, o);
         }
 
@@ -42,9 +62,9 @@
             return base.GetHashCode();
         }
 
-        private bool IsNull()
+        protected bool IsNull()
         {
-            return disposed;
+            return mDisposed || mInternalDisposed;
         }
     }
 }

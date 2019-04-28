@@ -3,3 +3,9 @@ EGUI2/EGUI2.Editor.csproj
 EGUI2/.vs/
 EGUI2/Library/
 EGUI2/Temp/
+EGUI2/Assembly-CSharp-Editor.csproj
+EGUI2/.idea/
+EGUI2/Assets/Plugins.meta
+EGUI2/EGUI2.sln.DotSettings.user
+EGUI2/Assets/Plugins/
+EGUI2/obj/Debug/Assembly-CSharp-Editor.csprojAssemblyReference.cache

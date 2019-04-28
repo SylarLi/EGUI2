@@ -39,7 +39,10 @@ namespace EGUI.Editor
             nodes = Duplicate(nodes) as Node[];
             persistence.ClearRegister();
             foreach (var node in nodes)
-                node.parent = null;
+            {
+                node.SetParent(null);
+                node.MarkInternalDisposed(true);
+            }
             return nodes;
         }
 
@@ -73,7 +76,8 @@ namespace EGUI.Editor
                 var requiredTypes = CoreUtil.GetRequiredTypes(type);
                 foreach (var requiredType in requiredTypes)
                 {
-                    commands.Add(new NodeAddLeafCommand(node, (Leaf)Activator.CreateInstance(requiredType)));
+                    if (node.GetLeaf(requiredType) == null)
+                        commands.Add(new NodeAddLeafCommand(node, (Leaf)Activator.CreateInstance(requiredType)));
                 }
                 commands.Add(new NodeAddLeafCommand(node, (Leaf)Activator.CreateInstance(type)));
             }
@@ -82,10 +86,10 @@ namespace EGUI.Editor
 
         internal static void RemoveLeaf(Leaf[] leaves)
         {
-            var nested = leaves.Where(leaf => CoreUtil.LeafIsRequiredByOthers(leaf));
-            if (nested.Count() > 0)
+            var nested = leaves.Where(CoreUtil.LeafIsRequiredByOthers);
+            if (nested.Any())
             {
-                EditorUtility.DisplayDialog(Language.L_Tips, string.Format(Language.L_RemoveLeafFailed, nested.First().GetType().Name), Language.L_Close);
+                EditorUtility.DisplayDialog(Locale.L_Tips, string.Format(Locale.L_RemoveLeafFailed, nested.First().GetType().Name), Locale.L_Close);
             }
             else
             {
@@ -97,9 +101,9 @@ namespace EGUI.Editor
 
         internal static void SelectNodes(Node[] nodes)
         {
-            if (!CoreUtil.CompareIList(UserSelection.nodes, nodes))
+            if (!CoreUtil.CompareIList(UserDatabase.selection.nodes, nodes))
             {
-                Command.Execute(new UpdateMemberCommand(typeof(UserSelection), "nodes", nodes));
+                Command.Execute(new UpdateMemberCommand(UserDatabase.selection, "nodes", nodes));
             }
         }
 
@@ -126,7 +130,7 @@ namespace EGUI.Editor
 
         internal static void CopyNodes(Node root)
         {
-            var nodes = UserSelection.nodes ?? new Node[0];
+            var nodes = UserDatabase.selection.nodes ?? new Node[0];
             var pending = FilterNested(FilterDuplicated(nodes));
             if (pending.Length > 0)
             {
@@ -137,7 +141,7 @@ namespace EGUI.Editor
 
         internal static void PasteNodes(Node root)
         {
-            var parent = UserSelection.node != null ? UserSelection.node.parent : root;
+            var parent = UserDatabase.selection.node != null ? UserDatabase.selection.node.parent : root;
             var pending = UserClipBoard.Paste() as Node[];
             if (pending != null && pending.Length > 0)
             {
@@ -147,7 +151,7 @@ namespace EGUI.Editor
 
         internal static void DuplicateNodes(Node root)
         {
-            var nodes = UserSelection.nodes ?? new Node[0];
+            var nodes = UserDatabase.selection.nodes ?? new Node[0];
             var pending = FilterNested(FilterDuplicated(nodes));
             if (pending.Length > 0)
             {
@@ -155,41 +159,26 @@ namespace EGUI.Editor
             }
         }
 
-        internal static void DeleteNodes(Node root)
+        internal static void DeleteNodes()
         {
-            var nodes = UserSelection.nodes ?? new Node[0];
+            var nodes = UserDatabase.selection.nodes ?? new Node[0];
             var pending = FilterNested(FilterDuplicated(nodes));
             if (pending.Length > 0)
             {
-                Command.Execute(new NodeDeleteThenUpdateSelectionCommand(pending, root));
+                Command.Execute(new NodeDeleteThenUpdateSelectionCommand(pending));
             }
         }
 
         internal static void CreateControl(Type type, Node root)
         {
-            var nodes = UserSelection.nodes;
+            var nodes = UserDatabase.selection.nodes;
             if (nodes == null || nodes.Length == 0) nodes = new Node[] { root };
             var pending = FilterNested(FilterDuplicated(nodes));
             if (pending.Length > 0)
             {
                 var parent = pending[pending.Length - 1];
-                PersistentGUI.Caches.SetHierarchyFoldout(parent, true);
-                Command command = null;
-                if (type == typeof(Node))
-                    command = new DefaultNodeCreateThenUpdateSelectionCommand(parent);
-                else if (type == typeof(Image))
-                    command = new DefaultImageCreateThenUpdateSelectionCommand(parent);
-                else if (type == typeof(Text))
-                    command = new DefaultTextCreateThenUpdateSelectionCommand(parent);
-                else if (type == typeof(Button))
-                    command = new DefaultButtonCreateThenUpdateSelectionCommand(parent);
-                else if (type == typeof(Toggle))
-                    command = new DefaultToggleCreateThenUpdateSelectionCommand(parent);
-                else if (type == typeof(TextField))
-                    command = new DefaultTextFieldCreateThenUpdateSelectionCommand(parent);
-                else
-                    throw new NotImplementedException();
-                Command.Execute(command);
+                UserDatabase.caches.SetHierarchyFoldout(parent, true);
+                Command.Execute(new DefaultControlCreateThenUpdateSelectionCommand(parent, type));
             }
         }
 
@@ -251,6 +240,37 @@ namespace EGUI.Editor
             while (node.parent != null)
                 node = node.parent;
             return node;
+        }
+
+        internal static void SaveFile(Node root, string path)
+        {
+            var eventSystem = root.GetLeaf<EventSystem>();
+            var enabled = eventSystem.enabled;
+            eventSystem.enabled = true;
+            var archetype = ScriptableObject.CreateInstance<Archetype>();
+            archetype.data = persistence.Serialize(root);
+            AssetDatabase.CreateAsset(archetype, path);
+            eventSystem.enabled = enabled;
+        }
+
+        internal static string SaveFileAs(Node root)
+        {
+            var path = EditorUtility.SaveFilePanelInProject("Save as", "Archetype", "asset", "Save Archetype");
+            if (!string.IsNullOrEmpty(path))
+                SaveFile(root, path);
+            return path;
+        }
+
+        internal static void LoadFile(out Node root, out string path)
+        {
+            root = null;
+            path = EditorUtility.OpenFilePanel("Load", "", "asset");
+            if (!string.IsNullOrEmpty(path))
+            {
+                path = "Assets" + path.Replace(Application.dataPath, "");
+                var archetype = AssetDatabase.LoadAssetAtPath<Archetype>(path);
+                root = archetype != null ? persistence.Deserialize<Node>(archetype.data) : null;    
+            }
         }
     }
 }

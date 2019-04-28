@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using EGUI.UI;
 using UnityEngine;
 using UnityEditor;
 
@@ -10,52 +11,84 @@ namespace EGUI.Editor
     {
         private PersistentObject mTarget;
 
-        public PersistentObject target { get { return mTarget; } set { mTarget = value; } }
+        public PersistentObject target
+        {
+            get { return mTarget; }
+            set { mTarget = value; }
+        }
 
         protected override void OnGUI()
         {
-            if (target == null) return;
-            var rect = EditorGUILayout.GetControlRect(false, EditorStyles.toolbarButton.fixedHeight);
+            if (target == null)
+            {
+                EditorGUI.LabelField(nativeRect, Locale.L_Inspector, UserSetting.FrameTipsLabelStyle);
+                return;
+            }
+
+            PersistentGUI.BeginLabelWidth(100);
+            var brect = EditorGUILayout.GetControlRect(false, EditorStyles.toolbarButton.fixedHeight);
             var tsize = EditorStyles.toggle.CalcSize(GUIContent.none);
-            var trect = new Rect(rect.x + 5, rect.y + (rect.height - tsize.y) * 0.5f - 1, tsize.x, tsize.y);
-            var lheight = EditorStyles.textField.CalcHeight(GUIContent.none, rect.width);
-            var lrect = new Rect(trect.xMax, rect.y + (rect.height - lheight) * 0.5f, rect.width - trect.xMax, lheight);
+            var trect = new Rect(brect.x + 5, brect.y + (brect.height - tsize.y) * 0.5f - 1, tsize.x, tsize.y);
+            var lheight = EditorStyles.textField.CalcHeight(GUIContent.none, brect.width);
+            var lrect = new Rect(trect.xMax, brect.y + (brect.height - lheight) * 0.5f, brect.width - trect.xMax,
+                lheight);
             PersistentGUI.PropertyField(trect, GUIContent.none, target.Find("enabled"));
             PersistentGUI.PropertyField(lrect, GUIContent.none, target.Find("name"));
 
-            var baseDisplays = new string[] { "localPosition", "localAngle", "localScale", "pivot" };
+            var nodes = target.GetValues<Node>();
+            if (nodes.Length > 1)
+            {
+                PersistentGUILayout.PropertyField(target.Find("anchoredPosition"));
+                PersistentGUILayout.PropertyField(target.Find("size"));
+            }
+            else
+            {
+                var node = nodes[0];
+                var anchorMin = node.anchorMin;
+                var anchorMax = node.anchorMax;
+                var labels = new GUIContent[4];
+                var props = new PersistentProperty[4];
+                if (anchorMin.x == anchorMax.x)
+                {
+                    labels[0] = new GUIContent("X");
+                    props[0] = target.Find("anchoredPosition.x");
+                    labels[2] = new GUIContent("W");
+                    props[2] = target.Find("size.x");
+                }
+                else
+                {
+                    labels[0] = new GUIContent("Left");
+                    props[0] = target.Find("offsetMin.x");
+                    labels[2] = new GUIContent("Right");
+                    props[2] = target.Find("offsetMax.x");
+                }
+
+                if (anchorMin.y == anchorMax.y)
+                {
+                    labels[1] = new GUIContent("Y");
+                    props[1] = target.Find("anchoredPosition.y");
+                    labels[3] = new GUIContent("H");
+                    props[3] = target.Find("size.y");
+                }
+                else
+                {
+                    labels[1] = new GUIContent("Top");
+                    props[1] = target.Find("offsetMin.y");
+                    labels[3] = new GUIContent("Bottom");
+                    props[3] = target.Find("offsetMax.y");
+                }
+
+                var position = EditorGUILayout.GetControlRect(false,
+                    EditorGUIUtility.singleLineHeight * (EditorGUIUtility.wideMode ? 2 : 3));
+                position.height = EditorGUIUtility.singleLineHeight;
+                PersistentGUI.MultiPropertyField2x2(position, new GUIContent("Position"), labels, props, 50);
+            }
+
+            var baseDisplays = new[] {"anchorMin", "anchorMax", "pivot", "localPosition", "localAngle", "localScale"};
             foreach (var display in baseDisplays)
                 PersistentGUILayout.PropertyField(target.Find(display));
 
-            var propStretchWidth = target.Find("stretchWidth");
-            if (!propStretchWidth.hasMultipleDifferentValues)
-            {
-                PersistentGUILayout.PropertyField(propStretchWidth);
-                EditorGUI.indentLevel += 1;
-                var propWidth = target.Find(propStretchWidth.GetValue<bool>() ? "stretchSize.x" : "size.x");
-                PersistentGUILayout.PropertyField(new GUIContent("Width"), propWidth);
-                EditorGUI.indentLevel -= 1;
-            }
-            var propStretchHeight = target.Find("stretchHeight");
-            if (!propStretchHeight.hasMultipleDifferentValues)
-            {
-                PersistentGUILayout.PropertyField(propStretchHeight);
-                EditorGUI.indentLevel += 1;
-                var propHeight = target.Find(propStretchHeight.GetValue<bool>() ? "stretchSize.y" : "size.y");
-                PersistentGUILayout.PropertyField(new GUIContent("Height"), propHeight);
-                EditorGUI.indentLevel -= 1;
-            }
-
-            EditorGUILayout.LabelField("Padding");
-            EditorGUI.indentLevel += 1;
-            PersistentGUILayout.PropertyField(new GUIContent("Left"), target.Find("padding.x"));
-            PersistentGUILayout.PropertyField(new GUIContent("Top"), target.Find("padding.y"));
-            PersistentGUILayout.PropertyField(new GUIContent("Right"), target.Find("padding.z"));
-            PersistentGUILayout.PropertyField(new GUIContent("Bottom"), target.Find("padding.w"));
-            EditorGUI.indentLevel -= 1;
-
             var leafTypes = new List<Type>();
-            var nodes = target.GetValues<Node>();
             foreach (var node in nodes)
             {
                 var leaves = node.GetAllLeaves();
@@ -68,36 +101,46 @@ namespace EGUI.Editor
                     }
                 }
             }
+
             leafTypes = leafTypes.FindAll(t => nodes.All(n => n.GetLeaf(t) != null));
-            leafTypes.Sort((t1, t2) => t1.Name.CompareTo(t2.Name));
+            leafTypes.Sort((t1, t2) => String.Compare(t1.Name, t2.Name, StringComparison.Ordinal));
             foreach (var leafType in leafTypes)
             {
                 var leaves = Array.ConvertAll(nodes, n => n.GetLeaf(leafType));
                 var obj = new PersistentObject(leaves);
                 PersistentGUILayout.UserDrawerLayout(obj);
+                EditorGUILayout.Space();
             }
+
             if (nodes.Length > 1 && nodes.Any(n => n.GetAllLeaves(true).Count() != leafTypes.Count))
             {
                 EditorGUILayout.Separator();
                 PersistentGUI.BeginColor(Color.yellow);
-                EditorGUILayout.LabelField(Language.L_MultiEditLeavesTips);
+                EditorGUILayout.LabelField(Locale.L_MultiEditLeavesTips);
                 PersistentGUI.EndColor();
             }
+
             EditorGUILayout.Separator();
-            if (GUILayout.Button(Language.L_AddLeaf, GUILayout.MaxWidth(100)))
+            if (GUILayout.Button(Locale.L_AddLeaf, GUILayout.MaxWidth(100)))
             {
                 var allTypes = CoreUtil.FindSubTypes(typeof(Leaf));
-                Array.Sort(allTypes, (t1, t2) => t1.Name.CompareTo(t2.Name));
+                Array.Sort(allTypes, (t1, t2) => String.Compare(t1.Name, t2.Name, StringComparison.Ordinal));
                 var menu = new GenericMenu();
                 foreach (var type in allTypes)
                 {
-                    menu.AddItem(new GUIContent(type.Name), false, () =>
-                    {
-                        UserUtil.AddLeaf(nodes, type);
-                    });
+                    var leafType = type;
+                    menu.AddItem(new GUIContent(leafType.Name), false, () => { UserUtil.AddLeaf(nodes, leafType); });
                 }
+
                 menu.ShowAsContext();
             }
+
+            PersistentGUI.EndLabelWidth();
+        }
+
+        protected override void OnLostFocus()
+        {
+            GUI.FocusControl(null);
         }
     }
 }

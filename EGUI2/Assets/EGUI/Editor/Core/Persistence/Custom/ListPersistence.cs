@@ -13,22 +13,33 @@ namespace EGUI
 
         public override void Parse(object value, BinaryWriter writer)
         {
-            var itemType = persistentType.GetGenericArguments()[0];
+            PushCheckpoint(writer);
+            var type = value.GetType();
+            SerializeType(type, writer);
+            var itemType = type.GetGenericArguments()[0];
             var list = value as IList;
             writer.Write(list.Count);
-            for (int i = 0; i < list.Count; i++)
+            for (var i = 0; i < list.Count; i++)
             {
                 var item = list[i];
                 var trueType = item != null ? item.GetType() : itemType;
                 Serialize(item, trueType, writer);
             }
+            PopCheckpoint(writer);
         }
 
         public override object Revert(BinaryReader reader)
         {
+            SaveCheckpoint(reader);
+            var type = DeserializeType(reader);
+            if (type == null)
+            {
+                LoadCheckpoint(reader);
+                return null;
+            }
             var length = reader.ReadInt32();
-            var list = Activator.CreateInstance(persistentType, new object[] { length }) as IList;
-            for (int i = 0; i < length; i++)
+            var list = Activator.CreateInstance(type, length) as IList;
+            for (var i = 0; i < length; i++)
             {
                 var index = i;
                 list.Add(null);

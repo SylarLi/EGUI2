@@ -17,20 +17,31 @@ namespace EGUI
             mName = type.GetProperty("Name");
         }
 
-        public override Type persistentType { get { return CoreUtil.FindType("System.Reflection.MonoProperty"); } }
+        public override Type persistentType
+        {
+            get { return CoreUtil.FindType("System.Reflection.MonoProperty"); }
+        }
 
         public override void Parse(object value, BinaryWriter writer)
         {
-            SerializeType((Type)mReflectedType.GetValue(value, null), writer);
-            Serialize(mName.GetValue(value, null), typeof(string), writer);
+            PushCheckpoint(writer);
+            SerializeType((Type) mReflectedType.GetValue(value, null), writer);
+            writer.Write((string) mName.GetValue(value, null));
+            PopCheckpoint(writer);
         }
 
         public override object Revert(BinaryReader reader)
         {
+            SaveCheckpoint(reader);
             var type = DeserializeType(reader);
-            var name = "";
-            Deserialize(reader, ret => name = (string)ret);
-            return type.GetProperty(name, BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (type == null)
+            {
+                LoadCheckpoint(reader);
+                return null;
+            }
+            var name = reader.ReadString();
+            return type.GetProperty(name,
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         }
     }
 }

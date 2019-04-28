@@ -6,27 +6,36 @@ namespace EGUI
 {
     public class FieldInfoPersistence : CustomPersistence
     {
-        public FieldInfoPersistence(Persistence persistence) : base(persistence) { }
+        public FieldInfoPersistence(Persistence persistence) : base(persistence)
+        {
+        }
 
-        public override Type persistentType { get { return typeof(FieldInfo); } }
+        public override Type persistentType
+        {
+            get { return typeof(FieldInfo); }
+        }
 
         public override void Parse(object value, BinaryWriter writer)
         {
+            PushCheckpoint(writer);
             var fieldInfo = value as FieldInfo;
             SerializeType(fieldInfo.ReflectedType, writer);
-            Serialize(fieldInfo.Name, typeof(string), writer);
-            SerializeValue(fieldInfo.IsStatic, typeof(bool), writer);
-            SerializeValue(fieldInfo.IsPublic, typeof(bool), writer);
+            writer.Write(fieldInfo.Name);
+            PopCheckpoint(writer);
         }
 
         public override object Revert(BinaryReader reader)
         {
+            SaveCheckpoint(reader);
             var type = DeserializeType(reader);
-            var name = "";
-            Deserialize(reader, ret => name = (string)ret);
-            var isStatic = (bool)DeserializeValue(typeof(bool), reader);
-            var isPublic = (bool)DeserializeValue(typeof(bool), reader);
-            return type.GetField(name, (isStatic ? BindingFlags.Static : BindingFlags.Instance) | (isPublic ? BindingFlags.Public : BindingFlags.NonPublic));
+            if (type == null)
+            {
+                LoadCheckpoint(reader);
+                return null;
+            }
+            var name = reader.ReadString();
+            return type.GetField(name,
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         }
     }
 }

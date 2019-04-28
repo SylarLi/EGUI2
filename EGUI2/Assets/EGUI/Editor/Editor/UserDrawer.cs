@@ -54,7 +54,7 @@ namespace EGUI.Editor
                             else if (Event.current.button == 1)
                             {
                                 var menu = new GenericMenu();
-                                menu.AddItem(new GUIContent(Language.L_RemoveLeaf), false, () =>
+                                menu.AddItem(new GUIContent(Locale.L_RemoveLeaf), false, () =>
                                 {
                                     var leaves = target.GetValues<Leaf>();
                                     UserUtil.RemoveLeaf(leaves);
