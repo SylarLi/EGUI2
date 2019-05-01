@@ -46,7 +46,6 @@ namespace EGUI.Editor
             return nodes;
         }
 
-
         public static string GetNiceDisplayName(string name)
         {
             if (name.Length <= 2)
@@ -103,23 +102,26 @@ namespace EGUI.Editor
         {
             if (!CoreUtil.CompareIList(UserDatabase.selection.nodes, nodes))
             {
-                Command.Execute(new UpdateMemberCommand(UserDatabase.selection, "nodes", nodes));
+                Command.Execute(new NodeSelectionCommand(nodes));
             }
         }
 
         internal static void MoveNodes(Node[] nodes, Node parent, int index)
         {
             var commands = new List<Command>();
+            var childCount = parent.childCount;
             foreach (var node in nodes)
             {
                 var targetIndex = index;
-                if (node.parent == parent && (targetIndex < 0 || targetIndex >= parent.childCount))
+                if (node.parent == parent && (targetIndex < 0 || targetIndex >= childCount))
                 {
-                    targetIndex = parent.childCount - 1;
+                    targetIndex = childCount - 1;
                 }
                 if (!node.IsAncestorOf(parent) && node != parent && (node.parent != parent || node.GetSiblingIndex() != targetIndex))
                 {
                     commands.Add(new NodeMoveCommand(node, parent, targetIndex));
+                    childCount += 1;
+                    index += 1;
                 }
             }
             if (commands.Count > 0)

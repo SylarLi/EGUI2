@@ -4,6 +4,6 @@ namespace EGUI.UI
 {
     public interface IEndDragHandler : IEventSystemHandler
     {
-        void OnEndDrag(Event eventData);
+        bool OnEndDrag(Event eventData);
     }
 }

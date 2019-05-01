@@ -8,9 +8,10 @@ namespace EGUI.UI
 
         public OnClick onClick = () => { };
 
-        public void OnMouseClick(Event eventData)
+        public bool OnMouseClick(Event eventData)
         {
             onClick();
+            return true;
         }
     }
 }

@@ -4,6 +4,6 @@ namespace EGUI.UI
 {
     public interface IMouseDownHandler : IEventSystemHandler
     {
-        void OnMouseDown(Event eventData);
+        bool OnMouseDown(Event eventData);
     }
 }

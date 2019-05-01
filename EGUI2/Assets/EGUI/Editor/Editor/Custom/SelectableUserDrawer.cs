@@ -26,7 +26,6 @@ namespace EGUI.Editor
                         break;
                     case Selectable.Transition.SpriteSwap:
                         var spriteState = target.Find("spriteState");
-                        PersistentGUILayout.PropertyField(spriteState.Find("normalSprite"));
                         PersistentGUILayout.PropertyField(spriteState.Find("focusedSprite"));
                         PersistentGUILayout.PropertyField(spriteState.Find("pressedSprite"));
                         PersistentGUILayout.PropertyField(spriteState.Find("disabledSprite"));

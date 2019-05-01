@@ -71,9 +71,10 @@ namespace EGUI.UI
             AllToggles.Remove(this);
         }
 
-        public void OnMouseClick(Event eventData)
+        public bool OnMouseClick(Event eventData)
         {
             isOn = !isOn;
+            return true;
         }
 
         private void FlushToggleState()

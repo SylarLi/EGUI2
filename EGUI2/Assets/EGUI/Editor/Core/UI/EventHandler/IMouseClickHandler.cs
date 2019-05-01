@@ -4,6 +4,6 @@ namespace EGUI.UI
 {
     public interface IMouseClickHandler : IEventSystemHandler
     {
-        void OnMouseClick(Event eventData);
+        bool OnMouseClick(Event eventData);
     }
 }

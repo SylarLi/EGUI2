@@ -1,13 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel.Design.Serialization;
 using System.Linq;
-using System.Net.Sockets;
-using System.Xml.Schema;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.SocialPlatforms;
 using EventSystem = EGUI.UI.EventSystem;
 
 namespace EGUI.Editor
@@ -74,7 +69,7 @@ namespace EGUI.Editor
             if (selectedNodes == null || selectedNodes.Length == 0) return;
             foreach (var selectedNode in selectedNodes)
             {
-                PersistentGUI.BeginMatrix(GUI.matrix * selectedNode.GUIMatrix);
+                PersistentGUI.BeginMatrix(GUI.matrix * selectedNode.guiMatrix);
                 var localRect = selectedNode.localRect;
                 var scale = selectedNode.worldScale;
                 scale.x = Mathf.Max(scale.x, 0.01f);
@@ -115,7 +110,7 @@ namespace EGUI.Editor
                     var flag = false;
                     foreach (var selectedNode in selectedNodes)
                     {
-                        PersistentGUI.BeginMatrix(GUI.matrix * selectedNode.GUIMatrix);
+                        PersistentGUI.BeginMatrix(GUI.matrix * selectedNode.guiMatrix);
                         var mousePos = Event.current.mousePosition;
                         var localRect = selectedNode.localRect;
                         var scale = selectedNode.worldScale;
@@ -185,7 +180,7 @@ namespace EGUI.Editor
                     if (selectedNodes == null || selectedNodes.Length == 0) break;
                     foreach (var selectedNode in selectedNodes)
                     {
-                        PersistentGUI.BeginMatrix(GUI.matrix * selectedNode.GUIMatrix);
+                        PersistentGUI.BeginMatrix(GUI.matrix * selectedNode.guiMatrix);
                         var mousePos = Event.current.mousePosition;
                         var localRect = selectedNode.localRect;
                         var scale = selectedNode.worldScale;
@@ -214,7 +209,7 @@ namespace EGUI.Editor
                     if (selectedNodes == null || selectedNodes.Length == 0) break;
                     foreach (var selectedNode in selectedNodes)
                     {
-                        PersistentGUI.BeginMatrix(GUI.matrix * selectedNode.GUIMatrix);
+                        PersistentGUI.BeginMatrix(GUI.matrix * selectedNode.guiMatrix);
                         var delta = Event.current.delta;
                         var scale = selectedNode.localScale;
                         scale.x = Mathf.Abs(scale.x);
@@ -312,7 +307,7 @@ namespace EGUI.Editor
                             for (var i = 0; i < selectedNodes.Length; i++)
                             {
                                 var selectedNode = selectedNodes[i];
-                                PersistentGUI.BeginMatrix(GUI.matrix * selectedNode.GUIMatrix);
+                                PersistentGUI.BeginMatrix(GUI.matrix * selectedNode.guiMatrix);
                                 var localPosition = dragState.localPosition[i];
                                 var size = dragState.size[i];
                                 var currentLocalPosition = selectedNode.localPosition;

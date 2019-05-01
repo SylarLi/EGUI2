@@ -16,18 +16,29 @@ namespace EGUI.Editor
             set { mRoot = value; }
         }
 
+        private Node[] mTemps;
+
+        public Node[] selectedNodes
+        {
+            get { return mTemps ?? UserDatabase.selection.nodes; }
+        }
+
+        private int mHighlightProgress = 0;
+        private int mHighlightDuration = 0;
+
         protected override void OnGUI()
         {
             if (root == null) return;
+            OnPreEvent();
             OnDrawTips();
-            for (int i = 0; i < root.childCount; i++)
+            for (var i = 0; i < root.childCount; i++)
             {
                 OnNodeGUI(root.GetChild(i));
             }
 
-            OnCommonEvent();
+            OnPostEvent();
         }
-        
+
         private void OnDrawTips()
         {
             if (root.childCount == 0)
@@ -40,7 +51,7 @@ namespace EGUI.Editor
         {
             var nodeRect = EditorGUILayout.GetControlRect(false, EditorGUIUtility.singleLineHeight);
             nodeRect.height += EditorGUIUtility.standardVerticalSpacing;
-            var selected = UserDatabase.selection.nodes != null && UserDatabase.selection.nodes.Contains(node);
+            var selected = selectedNodes != null && selectedNodes.Contains(node);
             if (selected)
                 EditorGUI.DrawRect(nodeRect,
                     focused ? UserSetting.HierarchySelectedFocusedColor : UserSetting.HierarchySelectedColor);
@@ -59,6 +70,18 @@ namespace EGUI.Editor
                 {
                     if (node.childCount > 0)
                         EditorStyles.foldout.Draw(frect, GUIContent.none, controlId, foldout);
+                    if (UserDatabase.highlight.node == node)
+                    {
+                        if (mHighlightProgress == 0)
+                            UserDatabase.highlight.node = null;
+                        else
+                        {
+                            var color = UserSetting.HierarchyHighlightColor;
+                            color.a = (float) mHighlightProgress / mHighlightDuration; 
+                            PersistentGUI.DrawAAPolyLine(nodeRect, 2, color);
+                        }
+                        mHighlightProgress -= 1;
+                    }
                     break;
                 }
                 case EventType.MouseDown:
@@ -90,7 +113,7 @@ namespace EGUI.Editor
                                 list.Add(node);
                             }
 
-                            UserUtil.SelectNodes(nodes);
+                            mTemps = nodes;
                         }
                         else if (Event.current.shift && nodes.Length > 0)
                         {
@@ -99,7 +122,7 @@ namespace EGUI.Editor
                             foreach (var n in root)
                                 FlattenNode(list, n);
                             var index = list.IndexOf(node);
-                            var nIndex = list.IndexOf(UserDatabase.selection.node);
+                            var nIndex = nodes.Select(n => list.IndexOf(n)).Min();
                             var from = Mathf.Min(nIndex, index);
                             var to = Mathf.Max(nIndex, index);
                             for (var i = @from; i <= to; i++)
@@ -108,12 +131,12 @@ namespace EGUI.Editor
                                     filter.Add(list[i]);
                             }
 
-                            UserUtil.SelectNodes(filter.ToArray());
+                            mTemps = filter.ToArray();
                         }
                         else
                         {
                             if (!selected)
-                                UserUtil.SelectNodes(new Node[] {node});
+                                mTemps = new[] {node};
                             if (node.childCount > 0 && Event.current.clickCount == 2)
                             {
                                 foldout = !foldout;
@@ -128,7 +151,7 @@ namespace EGUI.Editor
                 }
                 case EventType.MouseUp:
                 {
-                    if (frect.Contains(mousePos)) break;
+                    if (!focused || frect.Contains(mousePos)) break;
                     if (UserDragDrop.dragging)
                     {
                         var nodes = UserDragDrop.data as Node[];
@@ -188,7 +211,7 @@ namespace EGUI.Editor
                             else if (!Event.current.shift)
                             {
                                 if (selected)
-                                    UserUtil.SelectNodes(new Node[] {node});
+                                    UserUtil.SelectNodes(new[] {node});
                             }
 
                             if (Event.current.button != 1)
@@ -202,9 +225,9 @@ namespace EGUI.Editor
                 }
                 case EventType.MouseDrag:
                 {
-                    if (Event.current.button == 0 && !UserDragDrop.dragging)
+                    if (focused && Event.current.button == 0 && !UserDragDrop.dragging)
                     {
-                        var nodes = UserDatabase.selection.nodes;
+                        var nodes = selectedNodes;
                         if (nodes != null && nodes.Contains(node) && nodeRect.Contains(mousePos))
                         {
                             var data = new Node[nodes.Length];
@@ -263,13 +286,43 @@ namespace EGUI.Editor
             }
         }
 
-        private void OnCommonEvent()
+        private void OnPreEvent()
         {
             var controlId = GUIUtility.GetControlID(FocusType.Keyboard);
             var eventType = Event.current.GetTypeForControl(controlId);
             var mousePos = Event.current.mousePosition;
             switch (eventType)
             {
+                case EventType.MouseUp:
+                {
+                    if (focused && nativeRect.Contains(mousePos) && mTemps != null)
+                    {
+                        UserUtil.SelectNodes(mTemps);
+                        mTemps = null;
+                    }
+
+                    break;
+                }
+            }
+        }
+
+        private void OnPostEvent()
+        {
+            var controlId = GUIUtility.GetControlID(FocusType.Keyboard);
+            var eventType = Event.current.GetTypeForControl(controlId);
+            var mousePos = Event.current.mousePosition;
+            switch (eventType)
+            {
+                case EventType.MouseDrag:
+                {
+                    if (!nativeRect.Contains(mousePos) && mTemps != null)
+                    {
+                        mTemps = null;
+                        Event.current.Use();
+                    }
+
+                    break;
+                }
                 case EventType.MouseDown:
                 {
                     if (Event.current.button == 0 &&
@@ -283,11 +336,27 @@ namespace EGUI.Editor
                 }
                 case EventType.MouseUp:
                 {
-                    if (Event.current.button == 1 &&
-                        nativeRect.Contains(mousePos))
+                    if (nativeRect.Contains(mousePos))
                     {
-                        UserMenu.ShowNodeContext(root);
-                        Event.current.Use();
+                        if (Event.current.button == 0)
+                        {
+                            if (UserDragDrop.dragging)
+                            {
+                                var nodes = UserDragDrop.data as Node[];
+                                if (nodes != null && nodes.Length > 0)
+                                {
+                                    UserUtil.MoveNodes(nodes, root, root.childCount);
+                                    UserDragDrop.StopDrag();
+                                    Cursor.SetState(Cursor.State.Default);
+                                    Event.current.Use();
+                                }
+                            }
+                        }
+                        else if (Event.current.button == 1)
+                        {
+                            UserMenu.ShowNodeContext(root);
+                            Event.current.Use();
+                        }
                     }
 
                     break;
@@ -423,6 +492,12 @@ namespace EGUI.Editor
                 scrollPos = new Vector2(scrollPos.x,
                     offset - bottom + EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing);
             }
+        }
+
+        public void Highlight(Node node)
+        {
+            ScrollTo(node);
+            mHighlightProgress = mHighlightDuration = 8;
         }
 
         private float GetHeight(Node node)

@@ -82,6 +82,7 @@ namespace EGUI.UI
             var pressedSprite = AssetDatabase.LoadAssetAtPath<Sprite>(DefaultResource.DefaultToggleActiveSprite);
             var bg = CreateImage(node);
             bg.node.name = "Background";
+            bg.node.anchoredPosition = new Vector2(0, 2);
             bg.sprite = normalSprite;
             bg.SetNativeSize();
             toggle.targetGraphic = bg;

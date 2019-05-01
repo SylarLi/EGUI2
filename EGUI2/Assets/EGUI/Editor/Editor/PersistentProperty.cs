@@ -147,7 +147,7 @@ namespace EGUI.Editor
             var objects = persistentObject.GetValues<object>();
             Debug.Assert(values.Length == objects.Length);
             var commands = new UpdateMemberCommand[objects.Length];
-            for (int i = 0; i < objects.Length; i++)
+            for (var i = 0; i < objects.Length; i++)
             {
                 commands[i] = new UpdateMemberCommand(objects[i], propertyPath, values[i]);
             }

@@ -26,13 +26,10 @@ namespace EGUI.UI
                     mRebuildDrawingList = false;
                 }
 
-                for (var i = 0; i < mDrawers.Count; i++)
+                foreach (var drawer in mDrawers)
                 {
-                    var drawer = mDrawers[i];
                     if (drawer != null && drawer.active)
-                    {
                         drawer.Draw();
-                    }
                 }
             }
         }
@@ -40,22 +37,10 @@ namespace EGUI.UI
         public void RebuildDrawingList()
         {
             mDrawers.Clear();
-            var derives = new Queue<Node>();
-            derives.Enqueue(node);
-            while (derives.Count > 0)
-            {
-                var current = derives.Dequeue();
-                var drawer = current.GetLeaf<Drawer>();
-                if (drawer != null)
-                {
-                    mDrawers.Add(drawer);
-                }
-
-                foreach (var child in current)
-                {
-                    derives.Enqueue(child);
-                }
-            }
+            var drawer = GetLeaf<Drawer>();
+            if (drawer != null)
+                mDrawers.Add(drawer);
+            node.GetLeavesInChildren(mDrawers);
         }
     }
 }

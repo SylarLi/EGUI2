@@ -10,9 +10,12 @@ namespace EGUI.Editor
         {
             caches.Clear();
             selection.nodes = null;
+            highlight.node = null;
         }
 
         public static Selection selection = new Selection();
+        
+        public static Highlight highlight = new Highlight();
 
         public class Selection
         {
@@ -36,6 +39,25 @@ namespace EGUI.Editor
             {
                 get { return nodes != null && nodes.Length > 0 ? nodes[nodes.Length - 1] : null; }
                 set { nodes = value != null ? new Node[] {value} : null; }
+            }
+        }
+
+        public class Highlight
+        {
+            public delegate void OnChange();
+
+            public OnChange onChange = () => { };
+            
+            private Node mNode;
+
+            public Node node
+            {
+                get { return mNode; }
+                set
+                {
+                    mNode = value;
+                    onChange();
+                }
             }
         }
 
@@ -66,6 +88,7 @@ namespace EGUI.Editor
                     mDefaultPropertyType.Add(typeof(UnityEngine.Object));
                     mDefaultPropertyType.Add(typeof(AnimationCurve));
                     mDefaultPropertyType.Add(typeof(Color32));
+                    mDefaultPropertyType.Add(typeof(Object));
                     mDefaultPropertyType.Add(typeof(bool));
                     mDefaultPropertyType.Add(typeof(int)); 
                     mDefaultPropertyType.Add(typeof(long));
@@ -76,7 +99,8 @@ namespace EGUI.Editor
     
                 return mDefaultPropertyType.Contains(propertyType) ||
                        propertyType.IsEnum ||
-                       propertyType.IsSubclassOf(typeof(UnityEngine.Object));
+                       propertyType.IsSubclassOf(typeof(UnityEngine.Object)) ||
+                       propertyType.IsSubclassOf(typeof(Object));
             }
 
             public UserPropertyDrawer GetPropertyDrawer(Type propertyType)

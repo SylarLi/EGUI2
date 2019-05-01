@@ -71,6 +71,28 @@ namespace EGUI.Editor
             if (scrollEnabled)
                 GUILayout.EndScrollView();
             GUILayout.EndArea();
+
+            var controlId = GUIUtility.GetControlID(FocusType.Passive);
+            var eventType = Event.current.GetTypeForControl(controlId);
+            switch (eventType)
+            {
+                case EventType.MouseDrag:
+                    if (UserDragDrop.dragging)
+                    {
+                        if (new Rect(rect.x, rect.yMax - 20, rect.width, 20).Contains(Event.current.mousePosition))
+                        {
+                            mScrollPos += new Vector2(0, 2);
+                            Event.current.Use();    
+                        }
+                        else if (new Rect(rect.x, rect.y, rect.width, 20).Contains(Event.current.mousePosition))
+                        {
+                            mScrollPos -= new Vector2(0, 2);
+                            Event.current.Use();
+                        }
+                    }
+
+                    break;
+            }
         }
 
         protected virtual void OnGUI()

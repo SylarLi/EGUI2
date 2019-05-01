@@ -11,14 +11,6 @@ namespace EGUI
     [Persistence]
     public class Node : Object, IEnumerable<Node>
     {
-        [PersistentField] private string mName = "";
-
-        public string name
-        {
-            get { return mName; }
-            set { mName = value; }
-        }
-
         [PersistentField] private Vector2 mLocalPosition = Vector2.zero;
 
         /// <summary>
@@ -344,7 +336,7 @@ namespace EGUI
         /// <summary>
         /// GUI matrix
         /// </summary>
-        public Matrix4x4 GUIMatrix
+        public Matrix4x4 guiMatrix
         {
             get
             {
@@ -431,9 +423,19 @@ namespace EGUI
         public override void Dispose()
         {
             base.Dispose();
-            RemoveAllLeaves();
+            for (var i = mLeaves.Count - 1; i >= 0; i--)
+            {
+                mLeaves[i].Dispose();
+                mLeaves.RemoveAt(i);
+            }
+
             mLeaves = null;
-            RemoveAllChildren();
+            for (var i = mChildren.Count - 1; i >= 0; i--)
+            {
+                mChildren[i].Dispose();
+                mChildren.RemoveAt(i);
+            }
+
             mChildren = null;
             parent = null;
         }
@@ -522,14 +524,18 @@ namespace EGUI
 
                     if (mParent != null)
                     {
-                        mParent.RemoveChild(this);
+                        var index = GetSiblingIndex();
+                        if (index >= 0)
+                        {
+                            mParent.mChildren.RemoveAt(index);
+                            for (; index < mParent.childCount; index++)
+                                mParent.mChildren[index].OnSiblingIndexChanged();
+                        }
                     }
 
                     mParent = value;
                     if (mParent != null)
-                    {
-                        mParent.AddChild(this);
-                    }
+                        mParent.mChildren.Add(this);
 
                     if (!IsNull())
                     {
@@ -631,44 +637,11 @@ namespace EGUI
             return mChildren.Find(node => node.name == name);
         }
 
-        public bool ContainsChild(Node child)
-        {
-            return mChildren.Contains(child);
-        }
-
         public void AddChild(Node child, int index = -1)
         {
-            if (!ContainsChild(child))
-            {
-                if (index < 0) index = childCount;
-                mChildren.Insert(index, child);
-                child.parent = this;
-            }
-        }
-
-        internal void RemoveChild(int index)
-        {
-            var child = mChildren[index];
-            mChildren.RemoveAt(index);
-            child.parent = null;
-        }
-
-        internal void RemoveChild(Node child)
-        {
-            if (ContainsChild(child))
-            {
-                mChildren.Remove(child);
-                child.parent = null;
-            }
-        }
-
-        internal void RemoveAllChildren()
-        {
-            for (int i = mChildren.Count - 1; i >= 0; i--)
-            {
-                mChildren[i].Dispose();
-                mChildren.RemoveAt(i);
-            }
+            child.parent = this;
+            if (index > 0)
+                SetSiblingIndex(index);
         }
 
         public int GetSiblingIndex()
@@ -676,7 +649,7 @@ namespace EGUI
             var index = -1;
             if (parent != null)
             {
-                for (int i = 0; i < parent.childCount; i++)
+                for (var i = 0; i < parent.childCount; i++)
                 {
                     if (parent.GetChild(i) == this)
                     {
@@ -699,17 +672,18 @@ namespace EGUI
                 if (current != index)
                 {
                     for (var i = current; i < index; i++)
-                    {
                         parent.mChildren[i] = parent.mChildren[i + 1];
-                    }
 
                     for (var i = current; i > index; i--)
-                    {
                         parent.mChildren[i] = parent.mChildren[i - 1];
-                    }
 
                     parent.mChildren[index] = this;
                     OnSiblingIndexChanged();
+                    for (var i = current; i < index; i++)
+                        parent.mChildren[i].OnSiblingIndexChanged();
+
+                    for (var i = current; i > index; i--)
+                        parent.mChildren[i].OnSiblingIndexChanged();
                 }
             }
         }
@@ -757,12 +731,13 @@ namespace EGUI
 
         private void OnParentChanged()
         {
-            mLeaves.ForEach(i => i.OnNodeParentChanged());
+            mLeaves.ForEach(i => i.OnParentChanged());
+            mChildren.ForEach(i => i.OnParentChanged());
         }
 
         private void OnSiblingIndexChanged()
         {
-            mLeaves.ForEach(i => i.OnNodeSiblingIndexChanged());
+            mLeaves.ForEach(i => i.OnSiblingIndexChanged());
         }
 
         private Vector2 GetPivotOffset()
@@ -844,12 +819,12 @@ namespace EGUI
             return mLeaves.Where(leaf => includeInactive || leaf.active).ToArray();
         }
 
-        public T GetLeafInAncestors<T>(bool includeInactive = true)
+        public T GetLeafInParent<T>(bool includeInactive = true)
         {
-            return (T) (object) GetLeafInAncestors(typeof(T), includeInactive);
+            return (T) (object) GetLeafInParent(typeof(T), includeInactive);
         }
 
-        public Leaf GetLeafInAncestors(Type type, bool includeInactive = true)
+        public Leaf GetLeafInParent(Type type, bool includeInactive = true)
         {
             Leaf leaf = null;
             var node = parent;
@@ -862,12 +837,12 @@ namespace EGUI
             return leaf;
         }
 
-        public T[] GetLeavesInAncestors<T>(bool includeInactive)
+        public T[] GetLeavesInParent<T>(bool includeInactive = true)
         {
-            return Array.ConvertAll(GetLeavesInAncestors(typeof(T), includeInactive), i => (T) (object) i);
+            return Array.ConvertAll(GetLeavesInParent(typeof(T), includeInactive), i => (T) (object) i);
         }
 
-        public Leaf[] GetLeavesInAncestors(Type type, bool includeInactive = true)
+        public Leaf[] GetLeavesInParent(Type type, bool includeInactive = true)
         {
             List<Leaf> leaves = new List<Leaf>();
             var node = parent;
@@ -885,46 +860,52 @@ namespace EGUI
             return leaves.ToArray();
         }
 
-        public T GetLeafInChildren<T>(bool includeInactive)
+        public T GetLeafInChildren<T>(bool includeInactive = true)
         {
             return (T) (object) GetLeafInChildren(typeof(T), includeInactive);
         }
 
-        public Leaf GetLeafInChildren(Type type, bool includeInactive)
+        public Leaf GetLeafInChildren(Type type, bool includeInactive = true)
         {
             Leaf leaf = null;
             foreach (var child in mChildren)
             {
                 leaf = child.GetLeaf(type, includeInactive);
                 if (leaf == null)
-                {
                     leaf = child.GetLeafInChildren(type, includeInactive);
-                }
 
                 if (leaf != null)
-                {
                     break;
-                }
             }
 
             return leaf;
         }
 
-        public T[] GetLeavesInChildren<T>(bool includeInactive)
+        public void GetLeavesInChildren<T>(List<T> leaves, bool includeInactive = true)
+        {
+            foreach (var child in mChildren)
+            {
+                var leaf = child.GetLeaf<T>(includeInactive);
+                if (leaf != null)
+                    leaves.Add(leaf);
+
+                child.GetLeavesInChildren<T>(leaves, includeInactive);
+            }
+        }
+
+        public T[] GetLeavesInChildren<T>(bool includeInactive = true)
         {
             return Array.ConvertAll(GetLeavesInChildren(typeof(T), includeInactive), i => (T) (object) i);
         }
 
-        public Leaf[] GetLeavesInChildren(Type type, bool includeInactive)
+        public Leaf[] GetLeavesInChildren(Type type, bool includeInactive = true)
         {
-            List<Leaf> leaves = new List<Leaf>();
+            var leaves = new List<Leaf>();
             foreach (var child in mChildren)
             {
                 var leaf = child.GetLeaf(type, includeInactive);
                 if (leaf != null)
-                {
                     leaves.Add(leaf);
-                }
 
                 leaves.AddRange(child.GetLeavesInChildren(type, includeInactive));
             }
@@ -955,15 +936,6 @@ namespace EGUI
             Debug.Assert(mLeaves.Contains(leaf));
             leaf.node = null;
             mLeaves.Remove(leaf);
-        }
-
-        internal void RemoveAllLeaves()
-        {
-            for (int i = mLeaves.Count - 1; i >= 0; i--)
-            {
-                mLeaves[i].Dispose();
-                mLeaves.RemoveAt(i);
-            }
         }
 
         #endregion
@@ -1067,6 +1039,36 @@ namespace EGUI
             if (angle < 0)
                 angle += 360;
             return angle;
+        }
+
+        public static Vector2 EstimateSize(Node node)
+        {
+            var size = Vector2.zero;
+            var points = new Vector2[4];
+            var queue = new Queue<Node>();
+            queue.Enqueue(node);
+            while (queue.Count > 0)
+            {
+                var current = queue.Dequeue();
+                foreach (var child in current)
+                    queue.Enqueue(child);
+                if (current.parent != null)
+                {
+                    var localRect = current.localRect;
+                    points[0].Set(localRect.x, localRect.y);
+                    points[1].Set(localRect.xMax, localRect.y);
+                    points[2].Set(localRect.xMax, localRect.yMax);
+                    points[3].Set(localRect.x, localRect.yMax);
+                    foreach (var point in points)
+                    {
+                        var wp = current.TransformPoint(point);
+                        size.x = Mathf.Max(size.x, wp.x);
+                        size.y = Mathf.Max(size.y, wp.y);
+                    }
+                }
+            }
+
+            return size;
         }
 
         #endregion

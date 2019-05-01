@@ -23,26 +23,26 @@ namespace EGUI
 
         public override void Execute()
         {
-            for (int i = 0; i < mCommands.Length; i++)
+            for (var i = 0; i < mCommands.Length; i++)
                 mCommands[i].Execute();
         }
 
         public override void Undo()
         {
-            for (int i = mCommands.Length - 1; i >= 0; i--)
+            for (var i = mCommands.Length - 1; i >= 0; i--)
                 mCommands[i].Undo();
         }
 
         public override bool Merge(Command command, bool checkOnly = false)
         {
             var cmd = command as CombinedCommand;
-            for (int i = 0; i < commands.Length; i++)
+            for (var i = 0; i < commands.Length; i++)
             {
                 if (cmd.commands[i].GetType() != commands[i].GetType())
                     return false;
             }
 
-            for (int i = 0; i < commands.Length; i++)
+            for (var i = 0; i < commands.Length; i++)
             {
                 if (!cmd.commands[i].Merge(commands[i], true))
                     return false;
@@ -50,7 +50,7 @@ namespace EGUI
 
             if (!checkOnly)
             {
-                for (int i = 0; i < commands.Length; i++)
+                for (var i = 0; i < commands.Length; i++)
                 {
                     cmd.commands[i].Merge(commands[i]);
                 }

@@ -16,9 +16,15 @@ namespace EGUI.UI
             get
             {
                 if (mMask == null) mMask = GetLeaf<RectMask2D>();
-                if (mMask == null) mMask = GetLeafInAncestors<RectMask2D>();
+                if (mMask == null) mMask = GetLeafInParent<RectMask2D>();
                 return mMask;
             }
+        }
+
+        public override void OnParentChanged()
+        {
+            base.OnParentChanged();
+            mMask = null;
         }
 
         protected override void DrawContent(GUIContent content, bool isOn = false, bool isHover = false, bool isActive = false,

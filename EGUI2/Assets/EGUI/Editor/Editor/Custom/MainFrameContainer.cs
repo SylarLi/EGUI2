@@ -1,4 +1,5 @@
-﻿using UnityEditor;
+﻿using EGUI.UI;
+using UnityEditor;
 using UnityEngine;
 
 namespace EGUI.Editor
@@ -25,8 +26,13 @@ namespace EGUI.Editor
             get { return mPreview; }
             set
             {
-                mPreview = value;
-                if (mSceneFrame != null) mSceneFrame.preview = mPreview;
+                if (mPreview != value)
+                {
+                    mPreview = value;
+                    if (mSceneFrame != null)
+                        mSceneFrame.preview = mPreview;
+                    GUI.FocusControl(null);
+                }
             }
         }
 
@@ -66,6 +72,21 @@ namespace EGUI.Editor
                         }
 
                         mHierarchyFrame.ScrollTo(UserDatabase.selection.node);
+                    }
+                };
+                UserDatabase.highlight.onChange += () =>
+                {
+                    var node = UserDatabase.highlight.node;
+                    if (node != null)
+                    {
+                        var current = node.parent;
+                        while (current.parent != null)
+                        {
+                            UserDatabase.caches.SetHierarchyFoldout(current, true);
+                            current = current.parent;
+                        }
+
+                        mHierarchyFrame.Highlight(node);
                     }
                 };
             }
@@ -114,6 +135,11 @@ namespace EGUI.Editor
             var eventType = Event.current.GetTypeForControl(controlId);
             switch (eventType)
             {
+                case EventType.Repaint:
+                {
+                    EditorGUI.DrawRect(lineRect, UserSetting.FrameContainerBackgroundColor);
+                    break;
+                }
                 case EventType.MouseMove:
                 {
                     if (rect.Contains(Event.current.mousePosition))

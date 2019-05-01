@@ -81,20 +81,29 @@ namespace EGUI.UI
             mStateTransitionDirty = true;
         }
 
-        public virtual void OnMouseDown(Event eventData)
+        public virtual bool OnMouseDown(Event eventData)
         {
             FocusControl.currentSelectable = this;
             pressed = true;
+            return true;
         }
 
-        public virtual void OnMouseUp(Event eventData)
+        public virtual bool OnMouseUp(Event eventData)
         {
             pressed = false;
+            return true;
         }
 
-        public virtual void OnDrag(Event eventData)
+        public virtual bool OnDrag(Event eventData)
         {
-            pressed = node.localRect.Contains(node.world2LocalMatrix.MultiplyPoint(eventData.mousePosition));
+            var contains = node.ContainsWorldPosition(eventData.mousePosition);
+            if (pressed != contains)
+            {
+                pressed = contains;
+                return true;
+            }
+
+            return false;
         }
 
         private void FlushSelectionState()

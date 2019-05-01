@@ -50,9 +50,9 @@ namespace EGUI.Editor
                 var props = new PersistentProperty[4];
                 if (anchorMin.x == anchorMax.x)
                 {
-                    labels[0] = new GUIContent("X");
+                    labels[0] = new GUIContent("Pos X");
                     props[0] = target.Find("anchoredPosition.x");
-                    labels[2] = new GUIContent("W");
+                    labels[2] = new GUIContent("Width");
                     props[2] = target.Find("size.x");
                 }
                 else
@@ -65,9 +65,9 @@ namespace EGUI.Editor
 
                 if (anchorMin.y == anchorMax.y)
                 {
-                    labels[1] = new GUIContent("Y");
+                    labels[1] = new GUIContent("Pos Y");
                     props[1] = target.Find("anchoredPosition.y");
-                    labels[3] = new GUIContent("H");
+                    labels[3] = new GUIContent("Height");
                     props[3] = target.Find("size.y");
                 }
                 else
@@ -84,9 +84,11 @@ namespace EGUI.Editor
                 PersistentGUI.MultiPropertyField2x2(position, new GUIContent("Position"), labels, props, 50);
             }
 
-            var baseDisplays = new[] {"anchorMin", "anchorMax", "pivot", "localPosition", "localAngle", "localScale"};
-            foreach (var display in baseDisplays)
-                PersistentGUILayout.PropertyField(target.Find(display));
+            PersistentGUILayout.PropertyField(target.Find("anchorMin"));
+            PersistentGUILayout.PropertyField(target.Find("anchorMax"));
+            PersistentGUILayout.PropertyField(target.Find("pivot"));
+            PersistentGUILayout.FloatSlider(target.Find("localAngle"), 0f, 360f);
+            PersistentGUILayout.PropertyField(target.Find("localScale"));
 
             var leafTypes = new List<Type>();
             foreach (var node in nodes)

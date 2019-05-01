@@ -15,6 +15,8 @@ namespace EGUI.Editor
 
         public static Color HierarchyDragTipsColor = Color.white;
 
+        public static Color HierarchyHighlightColor = new Color(1f, 0.81f, 0f);
+
         public static int FrameMenuBarHeight = 18;
 
         public const int FrameIntervalSpace = 5;

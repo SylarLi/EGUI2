@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Net;
 using UnityEngine;
 using UnityEditor;
@@ -8,7 +9,13 @@ using UnityEngine.SocialPlatforms;
 
 namespace EGUI.Editor
 {
-    public class EGUIWindow : CustomWindow
+    /// <summary>
+    /// Todo: TextField, ScrollView, Slider
+    /// Todo: Legacy GUI
+    /// Todo: Serialization Binding
+    /// Todo: Archetype Prefab
+    /// </summary>
+    public class EGUIWindow : ArchetypeWindow
     {
         [MenuItem("EGUI/Editor")]
         private static void Test()
@@ -18,7 +25,7 @@ namespace EGUI.Editor
 
         private MainFrameContainer container;
 
-        private string file;
+        [SerializeField] private string file;
 
         protected override void OnEnable()
         {
@@ -78,7 +85,7 @@ namespace EGUI.Editor
             }
 
             var displayName = string.IsNullOrEmpty(file) ? Locale.L_Untitled : Path.GetFileNameWithoutExtension(file);
-            if (string.IsNullOrEmpty(file) || Command.Floating()) displayName += "*";
+            if (string.IsNullOrEmpty(file) || IsCommandFloating()) displayName += "*";
             EditorGUI.LabelField(new Rect(70, 1, position.width - 60 - 60, position.height), displayName,
                 EditorStyles.miniLabel);
             if (GUI.Button(new Rect(0, 0, 60, UserSetting.FrameMenuBarHeight), "File", EditorStyles.toolbarButton))
@@ -99,6 +106,7 @@ namespace EGUI.Editor
                         Cursor.SetState(Cursor.State.Default);
                         Event.current.Use();
                     }
+
                     break;
                 }
                 case EventType.MouseMove:
@@ -153,7 +161,7 @@ namespace EGUI.Editor
             var menu = new GenericMenu();
             menu.AddItem(new GUIContent(Locale.L_New), false, () =>
             {
-                if (string.IsNullOrEmpty(file) || !File.Exists(file) || Command.Floating())
+                if (string.IsNullOrEmpty(file) || !File.Exists(file) || IsCommandFloating())
                 {
                     var ret = EditorUtility.DisplayDialogComplex(Locale.L_SceneModifiedTitle,
                         Locale.L_SceneModifiedContent,
@@ -166,7 +174,7 @@ namespace EGUI.Editor
                 New();
             });
             menu.AddSeparator("");
-            if (string.IsNullOrEmpty(file) || !File.Exists(file) || Command.Floating())
+            if (string.IsNullOrEmpty(file) || !File.Exists(file) || IsCommandFloating())
                 menu.AddItem(new GUIContent(Locale.L_Save), false, Save);
             else
                 menu.AddDisabledItem(new GUIContent(Locale.L_Save));
@@ -176,14 +184,14 @@ namespace EGUI.Editor
             menu.AddSeparator("");
             menu.AddItem(new GUIContent(Locale.L_Open), false, () =>
             {
-                if (string.IsNullOrEmpty(file) || !File.Exists(file) || Command.Floating())
+                if (string.IsNullOrEmpty(file) || !File.Exists(file) || IsCommandFloating())
                 {
                     var ret = EditorUtility.DisplayDialogComplex(Locale.L_SceneModifiedTitle,
                         Locale.L_SceneModifiedContent,
                         Locale.L_Save, Locale.L_DontSave, Locale.L_Cancel);
                     if (ret == 0)
                         Save();
-                    else if (ret == 2) return; 
+                    else if (ret == 2) return;
                 }
 
                 Open();
@@ -234,6 +242,11 @@ namespace EGUI.Editor
                 if (container != null)
                     container.SetRoot(root);
             }
+        }
+
+        private bool IsCommandFloating()
+        {
+            return Command.Floatings().Any(i => !(i is NodeSelectionCommand));
         }
 
         protected override Data NewData()

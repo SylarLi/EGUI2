@@ -7,13 +7,15 @@ using Canvas = UnityEngine.Canvas;
 
 namespace EGUI.Editor
 {
-    public abstract class CustomWindow : EditorWindow, ISerializationCallbackReceiver
+    public abstract class ArchetypeWindow : EditorWindow, ISerializationCallbackReceiver
     {
         [NonSerialized] private Data mData;
 
         [SerializeField] private byte[] mDataBytes;
 
         [SerializeField] private Vector2 mScrollPos = Vector2.zero;
+
+        [SerializeField] private UndoRedoMarker mUndoRedoMarker;
 
         private Data data
         {
@@ -22,7 +24,7 @@ namespace EGUI.Editor
                 if (mDataBytes != null && mDataBytes.Length > 0)
                 {
                     mData = new Persistence().Deserialize<Data>(mDataBytes);
-                    mDataBytes = null;
+                    mDataBytes = null; 
                 }
 
                 mData = mData ?? NewData();
@@ -54,10 +56,18 @@ namespace EGUI.Editor
         protected virtual void OnEnable()
         {
             wantsMouseMove = true;
+            if (mUndoRedoMarker == null) 
+                mUndoRedoMarker = CreateInstance<UndoRedoMarker>();
+            Undo.undoRedoPerformed -= OnUndoRedoPerformed;
+            Undo.undoRedoPerformed += OnUndoRedoPerformed;
+            Command.onCommandPushed -= OnCommandPushed;
+            Command.onCommandPushed += OnCommandPushed;
         }
 
         protected virtual void OnDisable()
         {
+            Undo.undoRedoPerformed -= OnUndoRedoPerformed;
+            Command.onCommandPushed -= OnCommandPushed;
         }
 
         protected virtual void OnFocus()
@@ -108,21 +118,46 @@ namespace EGUI.Editor
             OnRender();
             OnPostRender();
 
-            if (undoRedoEnabled &&
-                Event.current.type == EventType.KeyDown &&
-                Event.current.shift)
+//            if (undoRedoEnabled &&
+//                Event.current.type == EventType.KeyDown &&
+//                Event.current.shift)
+//            {
+//                if (Event.current.keyCode == KeyCode.Z)
+//                {
+//                    Command.PerformUndo();
+//                    Event.current.Use();
+//                }
+//                else if (Event.current.keyCode == KeyCode.Y)
+//                {
+//                    Command.PerformRedo();
+//                    Event.current.Use();
+//                }
+//            }
+        }
+
+        private void OnUndoRedoPerformed()
+        {
+            if (undoRedoEnabled)
             {
-                if (Event.current.keyCode == KeyCode.Z)
+                switch (mUndoRedoMarker.last)
                 {
-                    Command.PerformUndo();
-                    Event.current.Use();
+                    case UndoRedoMarker.UndoRedo.Undo:
+                        Command.PerformUndo();
+                        break;
+                    case UndoRedoMarker.UndoRedo.Redo:
+                        Command.PerformRedo();
+                        break;
                 }
-                else if (Event.current.keyCode == KeyCode.Y)
-                {
-                    Command.PerformRedo();
-                    Event.current.Use();
-                }
+
+                mUndoRedoMarker.last = UndoRedoMarker.UndoRedo.None;
+                Repaint();
             }
+        }
+
+        private void OnCommandPushed(Command command)
+        {
+            Undo.RecordObject(mUndoRedoMarker, "UndoRedoProxyObject");
+            mUndoRedoMarker.Mark();
         }
 
         protected virtual void ClearCache()
@@ -132,6 +167,9 @@ namespace EGUI.Editor
                 mData.Clear();
                 mData = null;
             }
+
+            if (mUndoRedoMarker != null)
+                mUndoRedoMarker.Clear();
         }
 
         [Persistence]

@@ -4,6 +4,6 @@ namespace EGUI.UI
 {
     public interface IScrollWheelHandler : IEventSystemHandler
     {
-        void OnScrollWheel(Event eventData);
+        bool OnScrollWheel(Event eventData);
     }
 }

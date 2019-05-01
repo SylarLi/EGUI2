@@ -4,7 +4,16 @@ namespace EGUI
 {
     [Persistence]
     public abstract class Object
-    {      
+    {
+        [PersistentField]
+        private string mName = "";
+
+        public string name
+        {
+            get { return mName; }
+            set { mName = value; }
+        }
+        
         [PersistentField]
         protected bool mDisposed;
 
@@ -44,6 +53,11 @@ namespace EGUI
         public static bool operator !=(Object obj1, Object obj2)
         {
             return !(obj1 == obj2);
+        }
+
+        public override string ToString()
+        {
+            return string.Format("{0}({1})", name, GetType().Name);
         }
 
         public override bool Equals(object obj)

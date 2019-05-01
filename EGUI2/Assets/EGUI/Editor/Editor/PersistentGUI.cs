@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 using UnityEditor;
+using UnityEngine.SocialPlatforms;
 
 namespace EGUI.Editor
 {
@@ -68,6 +69,125 @@ namespace EGUI.Editor
             return value;
         }
 
+        public static Object ObjectField(Rect position, GUIContent label, Object obj, Type type,
+            bool hasMultipleDifferentValues = false)
+        {
+            var controlId = GUIUtility.GetControlID(s_PropertyHash, FocusType.Keyboard, position);
+            var rect = EditorGUI.PrefixLabel(position, controlId, label);
+            var mousePos = Event.current.mousePosition;
+            var eventType = Event.current.GetTypeForControl(controlId);
+            switch (eventType)
+            {
+                case EventType.Repaint:
+                {
+                    var text = "";
+                    if (hasMultipleDifferentValues)
+                        text = "----";
+                    else if (obj != null)
+                    {
+                        text = obj.name;
+                        if (typeof(Leaf).IsAssignableFrom(type))
+                        {
+                            var node = (obj as Leaf).node;
+                            if (node != null)
+                                text = node.name;
+                        }
+
+                        text += "(" + type.Name + ")";
+                    }
+
+                    var state = (ObjectFieldState) GUIUtility.GetStateObject(typeof(ObjectFieldState), controlId);
+                    var active = state != null && state.active;
+                    EditorStyles.objectField.Draw(rect, new GUIContent(text), controlId, active);
+                    break;
+                }
+                case EventType.MouseDown:
+                {
+                    if (!rect.Contains(mousePos) || !GUI.enabled) break;
+                    EditorGUIUtility.editingTextField = false;
+                    GUIUtility.keyboardControl = controlId;
+                    if (obj != null)
+                    {
+                        if (typeof(Node).IsAssignableFrom(type))
+                            UserDatabase.highlight.node = obj as Node;
+                        else if (typeof(Leaf).IsAssignableFrom(type))
+                            UserDatabase.highlight.node = (obj as Leaf).node;
+                        else break;
+                    }
+
+                    Event.current.Use();
+                    break;
+                }
+                case EventType.MouseDrag:
+                {
+                    var state = (ObjectFieldState) GUIUtility.GetStateObject(typeof(ObjectFieldState), controlId);
+                    state.active = false;
+                    if (!rect.Contains(mousePos) || !GUI.enabled) break;
+                    if (!UserDragDrop.dragging) break;
+                    var data = UserDragDrop.data as Node[];
+                    if (data == null) break;
+                    if (typeof(Node).IsAssignableFrom(type))
+                    {
+                        if (data.Length != 1) break;
+                    }
+                    else if (typeof(Leaf).IsAssignableFrom(type))
+                    {
+                        if (data.Count(i => i.GetLeaf(type) != null) != 1) break;
+                    }
+                    else break;
+
+                    state.active = true;
+                    Event.current.Use();
+                    break;
+                }
+                case EventType.MouseUp:
+                {
+                    if (!rect.Contains(mousePos) || !GUI.enabled) break;
+                    if (!UserDragDrop.dragging) break;
+                    var data = UserDragDrop.data as Node[];
+                    if (data == null) break;
+                    Object target = null;
+                    if (typeof(Node).IsAssignableFrom(type))
+                    {
+                        if (data.Length != 1) break;
+                        target = data[0];
+                    }
+                    else if (typeof(Leaf).IsAssignableFrom(type))
+                    {
+                        var leaves = data.Select(i => i.GetLeaf(type)).Where(i => i != null);
+                        if (leaves.Count() != 1) break;
+                        target = leaves.ElementAt(0);
+                    }
+                    else break;
+
+                    UserDragDrop.StopDrag();
+                    Cursor.SetState(Cursor.State.Default);
+                    if (target != null && (target != obj || hasMultipleDifferentValues))
+                    {
+                        obj = target;
+                        GUI.changed = true;
+                    }
+
+                    var state = (ObjectFieldState) GUIUtility.GetStateObject(typeof(ObjectFieldState), controlId);
+                    state.active = false;
+                    Event.current.Use();
+                    break;
+                }
+            }
+
+            return obj;
+        }
+
+        public static void ObjectField(Rect position, GUIContent label, PersistentProperty property)
+        {
+            Debug.Assert(typeof(Object).IsAssignableFrom(property.type));
+            EditorGUI.BeginChangeCheck();
+            var obj = ObjectField(position, label, property.GetValue<Object>(), property.type,
+                property.hasMultipleDifferentValues);
+            if (EditorGUI.EndChangeCheck())
+                property.SetValue(obj);
+        }
+
         public static void IntSlider(Rect position, GUIContent label, PersistentProperty property, int leftValue,
             int rightValue)
         {
@@ -80,7 +200,7 @@ namespace EGUI.Editor
                 property.SetValue(newValue);
             EndShowMixedValue();
         }
-        
+
         public static void FloatSlider(Rect position, GUIContent label, PersistentProperty property, float leftValue,
             float rightValue)
         {
@@ -236,10 +356,10 @@ namespace EGUI.Editor
 
         public static void BoundsField(Rect position, GUIContent label, PersistentProperty property)
         {
-            bool flag = LabelHasContent(label);
+            var flag = LabelHasContent(label);
             if (flag)
             {
-                int controlID = GUIUtility.GetControlID(s_PropertyHash, FocusType.Keyboard, position);
+                var controlID = GUIUtility.GetControlID(s_PropertyHash, FocusType.Keyboard, position);
                 position = MultiFieldPrefixLabel(position, controlID, label, 3);
                 if (EditorGUIUtility.wideMode)
                 {
@@ -377,6 +497,10 @@ namespace EGUI.Editor
             {
                 updateValue = EditorGUI.CurveField(position, label, (AnimationCurve) value);
             }
+            else if (propertyType.IsSubclassOf(typeof(Object)))
+            {
+                updateValue = ObjectField(position, label, (Object) value, propertyType);
+            }
             else if (propertyType.IsEnum)
             {
                 updateValue = EditorGUI.EnumPopup(position, label, (Enum) value);
@@ -412,10 +536,14 @@ namespace EGUI.Editor
             {
                 BoundsField(position, label, property);
             }
+            else if (propertyType.IsSubclassOf(typeof(Object)))
+            {
+                ObjectField(position, label, property);
+            }
             else
             {
                 object updateValue = null;
-                object propertyValue = property.GetValue<object>();
+                var propertyValue = property.GetValue<object>();
                 BeginShowMixedValue(property.hasMultipleDifferentValues);
                 EditorGUI.BeginChangeCheck();
                 if (propertyType == typeof(bool))
@@ -499,7 +627,7 @@ namespace EGUI.Editor
                     {
                         var childLabel = new GUIContent(child.displayName);
                         height += EditorGUIUtility.standardVerticalSpacing;
-                        height += GetPropertyHeight(childLabel, child, includeChildren);
+                        height += GetPropertyHeight(childLabel, child, true);
                     }
                 }
             }
@@ -642,6 +770,11 @@ namespace EGUI.Editor
         public static bool IsDefaultPropertyType(Type propertyType)
         {
             return UserDatabase.caches.IsDefaultPropertyType(propertyType);
+        }
+
+        private class ObjectFieldState
+        {
+            public bool active = false;
         }
     }
 }

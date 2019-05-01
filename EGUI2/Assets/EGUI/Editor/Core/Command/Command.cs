@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
 
 namespace EGUI
 {
@@ -25,7 +27,7 @@ namespace EGUI
 
         private static int anchor = -1;
 
-        public long createTime = DateTime.Now.Ticks;
+        private long createTime = DateTime.Now.Ticks;
 
         public static void Execute(Command command)
         {
@@ -33,7 +35,7 @@ namespace EGUI
             if (command.UndoRedoable)
                 Push(command);
         }
-
+        
         public static bool Undoable()
         {
             return index >= 0;
@@ -102,9 +104,11 @@ namespace EGUI
             anchor = index;
         }
 
-        public static bool Floating()
+        public static Command[] Floatings()
         {
-            return anchor != index;
+            return anchor <= index
+                ? stack.Skip(anchor + 1).Take(index - anchor).ToArray()
+                : stack.Skip(index).Take(anchor - index).ToArray();
         }
 
         public virtual bool UndoRedoable

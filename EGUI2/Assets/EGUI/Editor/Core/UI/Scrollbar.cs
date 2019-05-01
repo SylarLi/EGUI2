@@ -60,31 +60,41 @@ namespace EGUI.UI
 
         private bool mDragging = false;
 
-        public override void OnMouseDown(Event eventData)
+        public override bool OnMouseDown(Event eventData)
         {
             base.OnMouseDown(eventData);
             var localPos = node.InverseTransformPoint(eventData.mousePosition);
-            if (node.ContainsLocalPosition(localPos))
-            {
-                DragMouseTo(localPos);
-            }
+            DragMouseTo(localPos);
+            return true;
         }
 
-        public void OnBeginDrag(Event eventData)
+        public bool OnBeginDrag(Event eventData)
         {
-            mDragging = node.ContainsWorldPosition(eventData.mousePosition);
+            mDragging = true;
+            return true;
         }
 
-        public override void OnDrag(Event eventData)
+        public override bool OnDrag(Event eventData)
         {
             base.OnDrag(eventData);
             if (mDragging)
+            {
                 DragMouseTo(node.InverseTransformPoint(eventData.mousePosition));
+                return true;
+            }
+
+            return false;
         }
 
-        public void OnEndDrag(Event eventData)
+        public bool OnEndDrag(Event eventData)
         {
-            mDragging = false;
+            if (mDragging)
+            {
+                mDragging = false;
+                return true;
+            }
+
+            return false;
         }
 
         private void DragMouseTo(Vector2 localPos)
@@ -139,7 +149,6 @@ namespace EGUI.UI
                     anchorMax.Set(Mathf.Min(1, anchorMin.x + size), 1);
                     break;
                 case Direction.RightToLeft:
-                    var length = (node.size.x - handleRect.size.x) / node.size.x;
                     anchorMin.Set(Mathf.Max(0, 1 - value * slidingLen - size), 0);
                     anchorMax.Set(Mathf.Min(1, anchorMin.x + size), 1);
                     break;

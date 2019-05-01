@@ -14,7 +14,7 @@ namespace EGUI.UI
             get
             {
                 if (mCanvas == null) mCanvas = GetLeaf<Canvas>();
-                if (mCanvas == null) mCanvas = GetLeafInAncestors<Canvas>();
+                if (mCanvas == null) mCanvas = GetLeafInParent<Canvas>();
                 return mCanvas;
             }
         }
@@ -75,7 +75,7 @@ namespace EGUI.UI
                 mStyleDirty = false;
             }
 
-            drawer.guiMatrix = node.GUIMatrix;
+            drawer.guiMatrix = node.guiMatrix;
             drawer.guiRect = node.localRect;
             drawer.guiStyle = style;
             drawer.color = color * tintColor;
@@ -98,13 +98,13 @@ namespace EGUI.UI
                 canvas.MarkRebuildDrawingList();
         }
 
-        public override void OnNodeParentChanged()
+        public override void OnParentChanged()
         {
             if (canvas != null)
                 canvas.MarkRebuildDrawingList();
         }
 
-        public override void OnNodeSiblingIndexChanged()
+        public override void OnSiblingIndexChanged()
         {
             if (canvas != null)
                 canvas.MarkRebuildDrawingList();

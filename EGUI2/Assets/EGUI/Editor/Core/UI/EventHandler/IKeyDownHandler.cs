@@ -4,6 +4,6 @@ namespace EGUI.UI
 {
     public interface IKeyDownHandler : IEventSystemHandler
     {
-        void OnKeyDown(Event eventData);
+        bool OnKeyDown(Event eventData);
     }
 }

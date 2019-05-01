@@ -52,10 +52,10 @@ namespace EGUI
 
         public virtual void OnDisable() { }
 
-        public virtual void OnNodeParentChanged() { }
-
-        public virtual void OnNodeSiblingIndexChanged() { }
-
+        public virtual void OnParentChanged() { }
+        
+        public virtual void OnSiblingIndexChanged() { }
+        
         public void RebuildActivation()
         {
             active = enabled && (node != null && node.active);
@@ -86,24 +86,24 @@ namespace EGUI
             return node.GetAllLeaves(includeInactive);
         }
 
-        public T GetLeafInAncestors<T>(bool includeInactive = true)
+        public T GetLeafInParent<T>(bool includeInactive = true)
         {
-            return node.GetLeafInAncestors<T>(includeInactive);
+            return node.GetLeafInParent<T>(includeInactive);
         }
 
-        public Leaf GetLeafInAncestors(Type type, bool includeInactive = true)
+        public Leaf GetLeafInParent(Type type, bool includeInactive = true)
         {
-            return node.GetLeafInAncestors(type, includeInactive);
+            return node.GetLeafInParent(type, includeInactive);
         }
 
-        public T[] GetLeavesInAncestors<T>(bool includeInactive)
+        public T[] GetLeavesInParent<T>(bool includeInactive)
         {
-            return node.GetLeavesInAncestors<T>(includeInactive);
+            return node.GetLeavesInParent<T>(includeInactive);
         }
 
-        public Leaf[] GetLeavesInAncestors(Type type, bool includeInactive = true)
+        public Leaf[] GetLeavesInParent(Type type, bool includeInactive = true)
         {
-            return node.GetLeavesInAncestors(type, includeInactive);
+            return node.GetLeavesInParent(type, includeInactive);
         }
 
         public T GetLeafInChildren<T>(bool includeInactive)

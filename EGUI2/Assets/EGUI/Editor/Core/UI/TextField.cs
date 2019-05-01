@@ -1,9 +1,12 @@
-﻿using System;
-using System.Reflection;
+﻿using System.Reflection;
+using UnityEditor;
 using UnityEngine;
 
 namespace EGUI.UI
 {
+    /// <summary>
+    /// Todo: 使用UnityEngine.TextEditor重构
+    /// </summary>
     [Persistence]
     public class TextField : Text, ISelectable, IInteractive, ILegacyEventHandler
     {
@@ -86,7 +89,7 @@ namespace EGUI.UI
         public override void RebuildStyle()
         {
             mStyle = new GUIStyle(GUI.skin.textField);
-            mStyle.font = font != null ? font : UnityEditor.EditorGUIUtility.Load("Lucida Grande") as Font;
+            mStyle.font = font != null ? font : EditorGUIUtility.Load("Lucida Grande") as Font;
             mStyle.fontStyle = fontStyle;
             mStyle.fontSize = fontSize;
             mStyle.richText = richText;
@@ -141,7 +144,7 @@ namespace EGUI.UI
             {
                 recycledEditor,
                 controlID,
-                node.localRect,
+                drawer.guiRect,
                 text,
                 style,
                 null,
@@ -178,7 +181,7 @@ namespace EGUI.UI
         {
             if (mRefTextEditor == null || mRefTextField == null)
             {
-                var type = typeof(UnityEditor.EditorGUI);
+                var type = typeof(EditorGUI);
                 mRefTextEditor = type.GetField("s_RecycledEditor", BindingFlags.NonPublic | BindingFlags.Static);
                 mRefIsEditing = mRefTextEditor.FieldType.GetMethod("IsEditingControl",
                     BindingFlags.NonPublic | BindingFlags.Instance);

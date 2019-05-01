@@ -29,7 +29,7 @@ namespace EGUI.UI
         public bool clipping = false;
 
         public Rect clipRect = Rect.zero;
-
+        
         public void Draw()
         {
             var rawMatrix = GUI.matrix;
@@ -38,7 +38,7 @@ namespace EGUI.UI
             GUI.color *= color;
             if (clipping)
                 GUI.BeginClip(clipRect);
-
+                
             if (drawProxy != null)
             {
                 drawProxy();

@@ -23,9 +23,11 @@ namespace EGUI.UI
 
         private bool Trigger(Event eventData)
         {
-            bool triggered = false;
+            var triggered = false;
             mTriggers.Clear();
-            if (IsMouseEvent(eventData.type))
+            var mouseEvent = IsMouseEvent(eventData.type);
+            var keyboardEvent = IsKeyboardEvent(eventData.type);
+            if (mouseEvent)
             {
                 var hits = Raycaster.RaycastAll(eventData.mousePosition, node);
                 foreach (var hit in hits)
@@ -37,12 +39,14 @@ namespace EGUI.UI
                         {
                             continue;
                         }
+
                         var interactive = hit.GetLeaf<IInteractive>();
                         if (interactive != null && !interactive.interactive)
                         {
                             continue;
                         }
                     }
+
                     mTriggers.Add(hit);
                 }
             }
@@ -55,133 +59,149 @@ namespace EGUI.UI
                     mTriggers.Add(leaf.node);
                 }
             }
+
             foreach (var trigger in mTriggers)
             {
+                var drawer = trigger.GetLeaf<Drawer>();
+                if (mouseEvent)
+                {
+                    var worldPos = eventData.mousePosition;
+                    var localPos = trigger.world2LocalMatrix.MultiplyPoint(worldPos);
+                    if (!trigger.localRect.Contains(localPos)) continue;
+                    if (drawer != null && drawer.clipping && !drawer.clipRect.Contains(localPos))
+                        continue;
+                }
+
                 var legacyHandler = trigger.GetLeaf<ILegacyEventHandler>(false);
                 if (legacyHandler != null)
                 {
+                    var rawMatrix = GUI.matrix;
+                    GUI.matrix *= trigger.guiMatrix;
+                    if (drawer != null && drawer.clipping)
+                        GUI.matrix *= Matrix4x4.Translate(-drawer.clipRect.min);
                     legacyHandler.OnEvent(eventData);
+                    GUI.matrix = rawMatrix;
                     triggered = eventData.type == EventType.Used;
                 }
                 else if (trigger.GetLeaf<IEventSystemHandler>(false) != null)
                 {
-                    if (IsMouseEvent(eventData.type))
+                    if (mouseEvent)
                     {
-                        var worldPos = eventData.mousePosition;
-                        var localPos = trigger.world2LocalMatrix.MultiplyPoint(worldPos);
-                        if (trigger.localRect.Contains(localPos))
+                        switch (eventData.type)
                         {
-                            switch (eventData.type)
+                            case EventType.MouseDown:
                             {
-                                case EventType.MouseDown:
-                                    {
-                                        triggered = OnDragStop(eventData) || triggered;
-                                        triggered = OnClickStart(eventData, trigger) || triggered;
-                                        break;
-                                    }
-                                case EventType.MouseUp:
-                                    {
-                                        triggered = OnDragStop(eventData) || triggered;
-                                        triggered = OnClickStop(eventData, trigger) || triggered;
-                                        break;
-                                    }
-                                case EventType.MouseMove:
-                                    {
-                                        triggered = OnMouseMove(eventData, trigger) || triggered;
-                                        break;
-                                    }
-                                case EventType.MouseDrag:
-                                    {
-                                        triggered = OnDragStart(eventData, trigger) || triggered;
-                                        triggered = OnDrag(eventData) || triggered;
-                                        break;
-                                    }
-                                case EventType.ScrollWheel:
-                                    {
-                                        triggered = OnScrollWheel(eventData, trigger) || triggered;
-                                        break;
-                                    }
+                                triggered = OnDragStop(eventData);
+                                triggered = OnClickStart(eventData, trigger) || triggered;
+                                break;
+                            }
+                            case EventType.MouseUp:
+                            {
+                                triggered = OnDragStop(eventData);
+                                triggered = OnClickStop(eventData, trigger) || triggered;
+                                break;
+                            }
+                            case EventType.MouseMove:
+                            {
+                                triggered = OnMouseMove(eventData, trigger);
+                                break;
+                            }
+                            case EventType.MouseDrag:
+                            {
+                                triggered = OnDragStart(eventData, trigger);
+                                triggered = OnDrag(eventData) || triggered;
+                                break;
+                            }
+                            case EventType.ScrollWheel:
+                            {
+                                triggered = OnScrollWheel(eventData, trigger);
+                                break;
                             }
                         }
                     }
-                    else if (IsKeyboardEvent(eventData.type))
+                    else if (keyboardEvent)
                     {
                         switch (eventData.type)
                         {
                             case EventType.keyDown:
-                                {
-                                    triggered = OnKeyDown(eventData, trigger) || triggered;
-                                    break;
-                                }
+                            {
+                                triggered = OnKeyDown(eventData, trigger);
+                                break;
+                            }
                             case EventType.KeyUp:
-                                {
-                                    triggered = OnKeyUp(eventData, trigger) || triggered;
-                                    break;
-                                }
+                            {
+                                triggered = OnKeyUp(eventData, trigger);
+                                break;
+                            }
                         }
                     }
                 }
+
                 if (triggered)
                 {
                     break;
                 }
             }
+
             if (!triggered)
             {
                 switch (eventData.type)
                 {
                     case EventType.MouseDrag:
-                        {
-                            triggered = OnDrag(eventData) || triggered;
-                            break;
-                        }
+                    {
+                        triggered = OnDrag(eventData);
+                        break;
+                    }
                     case EventType.MouseDown:
-                        {
-                            triggered = OnDragStop(eventData) || triggered;
-                            break;
-                        }
+                    {
+                        triggered = OnDragStop(eventData);
+                        break;
+                    }
                     case EventType.MouseUp:
+                    {
+                        triggered = OnDragStop(eventData);
+                        if (mMouseDown != null &&
+                            !mTriggers.Contains(mMouseDown))
                         {
-                            triggered = OnDragStop(eventData) || triggered;
-                            if (mMouseDown != null &&
-                                !mTriggers.Contains(mMouseDown))
-                            {
-                                mMouseDown = null;
-                            }
-                            break;
+                            mMouseDown = null;
                         }
+
+                        break;
+                    }
                 }
             }
+
             if (triggered && eventData.type != EventType.Used)
             {
                 eventData.Use();
             }
+
             return triggered;
         }
 
         private bool IsValidEvent(EventType eventType)
         {
             return eventType != EventType.Repaint &&
-                eventType != EventType.Used &&
-                eventType != EventType.Ignore;
+                   eventType != EventType.Used &&
+                   eventType != EventType.Ignore;
         }
 
         private bool IsMouseEvent(EventType eventType)
         {
             return eventType == EventType.MouseDown ||
-                eventType == EventType.MouseUp ||
-                eventType == EventType.MouseMove ||
-                eventType == EventType.MouseDrag ||
-                eventType == EventType.ScrollWheel ||
-                eventType == EventType.ContextClick ||
-                eventType == EventType.DragPerform ||
-                eventType == EventType.DragUpdated;
+                   eventType == EventType.MouseUp ||
+                   eventType == EventType.MouseMove ||
+                   eventType == EventType.MouseDrag ||
+                   eventType == EventType.ScrollWheel ||
+                   eventType == EventType.ContextClick ||
+                   eventType == EventType.DragPerform ||
+                   eventType == EventType.DragUpdated;
         }
 
         private bool IsKeyboardEvent(EventType eventType)
         {
             return eventType == EventType.KeyDown ||
-                eventType == EventType.KeyUp;
+                   eventType == EventType.KeyUp;
         }
 
         private bool OnDragStart(Event eventData, Node trigger)
@@ -197,6 +217,7 @@ namespace EGUI.UI
                     triggered = true;
                 }
             }
+
             return triggered;
         }
 
@@ -212,6 +233,7 @@ namespace EGUI.UI
                     triggered = true;
                 }
             }
+
             return triggered;
         }
 
@@ -226,8 +248,10 @@ namespace EGUI.UI
                     handler.OnEndDrag(eventData);
                     triggered = true;
                 }
+
                 mDrag = null;
             }
+
             return triggered;
         }
 
@@ -241,6 +265,7 @@ namespace EGUI.UI
                 handler.OnMouseDown(eventData);
                 triggered = true;
             }
+
             return triggered;
         }
 
@@ -253,6 +278,7 @@ namespace EGUI.UI
                 handler.OnMouseUp(eventData);
                 triggered = true;
             }
+
             if (mMouseDown == trigger)
             {
                 var handler1 = mMouseDown.GetLeaf<IMouseClickHandler>(false);
@@ -262,6 +288,7 @@ namespace EGUI.UI
                     triggered = true;
                 }
             }
+
             mMouseDown = null;
             return triggered;
         }
@@ -275,6 +302,7 @@ namespace EGUI.UI
                 handler.OnMouseMove(eventData);
                 triggered = true;
             }
+
             return triggered;
         }
 
@@ -287,6 +315,7 @@ namespace EGUI.UI
                 handler.OnScrollWheel(eventData);
                 triggered = true;
             }
+
             return triggered;
         }
 
@@ -299,6 +328,7 @@ namespace EGUI.UI
                 handler.OnKeyDown(eventData);
                 triggered = true;
             }
+
             return triggered;
         }
 
@@ -311,6 +341,7 @@ namespace EGUI.UI
                 handler.OnKeyUp(eventData);
                 triggered = true;
             }
+
             return triggered;
         }
     }

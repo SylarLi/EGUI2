@@ -4,6 +4,6 @@ namespace EGUI.UI
 {
     public interface IMouseMoveHandler : IEventSystemHandler
     {
-        void OnMouseMove(Event eventData);
+        bool OnMouseMove(Event eventData);
     }
 }
